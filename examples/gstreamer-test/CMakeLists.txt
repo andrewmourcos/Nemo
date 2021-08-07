@@ -1,32 +1,21 @@
 cmake_minimum_required(VERSION 3.16)
-set (CMAKE_CXX_STANDARD 11)
-
-project(websocket_test)
+project(gstreamer_test)
 
 message(WARNING "Andrew is awesome")
-
-set(THREADS_PREFER_PTHREAD_FLAG ON)
-
 
 # Lib finder
 find_package(Boost REQUIRED)
 find_package(Threads REQUIRED)
-find_package(OpenSSL REQUIRED)
 
 # Internal header files
+include_directories("./")
 
 # Internal source files
 file(GLOB SOURCES "*.cpp")
-add_executable(websocket_test ${SOURCES})
+add_executable(gstreamer_test ${SOURCES})
 
 # External header files
 include_directories( ${Boost_INCLUDE_DIRS} )
 
 # External libraries
-target_link_libraries(websocket_test PRIVATE Threads::Threads
-											 OpenSSL::SSL 
-											 OpenSSL::Crypto)
-
-
-
-
+target_link_libraries(gstreamer_test PRIVATE Threads::Threads)

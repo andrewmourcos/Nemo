@@ -233,9 +233,9 @@ int main(int argc, char** argv)
     if(argc != 4)
     {
         std::cerr <<
-            "Usage: websocket-client-async-ssl <host> <port> <text>\n" <<
+            "Usage: ./gstreamer_test <host> <port> <text>\n" <<
             "Example:\n" <<
-            "    websocket-client-async-ssl echo.websocket.org 443 \"Hello, world!\"\n";
+            "    ./gstreamer_test echo.websocket.org 443 \"Hello, world!\"\n";
         return EXIT_FAILURE;
     }
     auto const host = argv[1];
