@@ -36,8 +36,7 @@ using tcp = boost::asio::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
 //------------------------------------------------------------------------------
 
 // Report a failure
-void
-fail(beast::error_code ec, char const* what)
+void fail(beast::error_code ec, char const *what)
 {
     std::cerr << what << ": " << ec.message() << "\n";
 }
@@ -47,26 +46,25 @@ class session : public std::enable_shared_from_this<session>
 {
     tcp::resolver resolver_;
     websocket::stream<
-        beast::ssl_stream<beast::tcp_stream>> ws_;
+        beast::ssl_stream<beast::tcp_stream>>
+        ws_;
     beast::flat_buffer buffer_;
     std::string host_;
     std::string text_;
 
 public:
     // Resolver and socket require an io_context
-    explicit
-    session(net::io_context& ioc, ssl::context& ctx)
-        : resolver_(net::make_strand(ioc))
-        , ws_(net::make_strand(ioc), ctx)
+    explicit session(net::io_context &ioc, ssl::context &ctx)
+        : resolver_(net::make_strand(ioc)), ws_(net::make_strand(ioc), ctx)
     {
     }
 
     // Start the asynchronous operation
     void
     run(
-        char const* host,
-        char const* port,
-        char const* text)
+        char const *host,
+        char const *port,
+        char const *text)
     {
         // Save these for later
         host_ = host;
@@ -86,7 +84,7 @@ public:
         beast::error_code ec,
         tcp::resolver::results_type results)
     {
-        if(ec)
+        if (ec)
             return fail(ec, "resolve");
 
         // Set a timeout on the operation
@@ -103,7 +101,7 @@ public:
     void
     on_connect(beast::error_code ec, tcp::resolver::results_type::endpoint_type ep)
     {
-        if(ec)
+        if (ec)
             return fail(ec, "connect");
 
         // Update the host_ string. This will provide the value of the
@@ -115,12 +113,12 @@ public:
         beast::get_lowest_layer(ws_).expires_after(std::chrono::seconds(30));
 
         // Set SNI Hostname (many hosts need this to handshake successfully)
-        if(! SSL_set_tlsext_host_name(
+        if (!SSL_set_tlsext_host_name(
                 ws_.next_layer().native_handle(),
                 host_.c_str()))
         {
             ec = beast::error_code(static_cast<int>(::ERR_get_error()),
-                net::error::get_ssl_category());
+                                   net::error::get_ssl_category());
             return fail(ec, "connect");
         }
 
@@ -135,7 +133,7 @@ public:
     void
     on_ssl_handshake(beast::error_code ec)
     {
-        if(ec)
+        if (ec)
             return fail(ec, "ssl_handshake");
 
         // Turn off the timeout on the tcp_stream, because
@@ -149,24 +147,24 @@ public:
 
         // Set a decorator to change the User-Agent of the handshake
         ws_.set_option(websocket::stream_base::decorator(
-            [](websocket::request_type& req)
-            {
+            [](websocket::request_type &req) {
                 req.set(http::field::user_agent,
-                    std::string(BOOST_BEAST_VERSION_STRING) +
-                        " websocket-client-async-ssl");
+                        std::string(BOOST_BEAST_VERSION_STRING) +
+                            " websocket-client-async-ssl");
+                req.set(http::field::sec_websocket_protocol, "protoo");
             }));
 
         // Perform the websocket handshake
-        ws_.async_handshake(host_, "/",
-            beast::bind_front_handler(
-                &session::on_handshake,
-                shared_from_this()));
+        ws_.async_handshake(host_, "/?roomId=FISH&peerId=12905238091",
+                            beast::bind_front_handler(
+                                &session::on_handshake,
+                                shared_from_this()));
     }
 
     void
     on_handshake(beast::error_code ec)
     {
-        if(ec)
+        if (ec)
             return fail(ec, "handshake");
 
         // Send the message
@@ -184,7 +182,7 @@ public:
     {
         boost::ignore_unused(bytes_transferred);
 
-        if(ec)
+        if (ec)
             return fail(ec, "write");
 
         // Read a message into our buffer
@@ -202,20 +200,35 @@ public:
     {
         boost::ignore_unused(bytes_transferred);
 
-        if(ec)
+        if (ec)
             return fail(ec, "read");
 
-        // Close the WebSocket connection
-        ws_.async_close(websocket::close_code::normal,
+        // // Close the WebSocket connection
+        // ws_.async_close(websocket::close_code::normal,
+        //     beast::bind_front_handler(
+        //         &session::on_close,
+        //         shared_from_this()));
+
+        // Read a message into our buffer
+        ws_.async_read(
+            buffer_,
             beast::bind_front_handler(
-                &session::on_close,
+                &session::on_read,
                 shared_from_this()));
+        
+        // ws_.async_write(
+        //     net::buffer(std::string("{\"request\":true,\"id\":7638,\"method\":\"acknowledgeMessage\",\"data\":{\"info\":\"message acknowledged\"}}")),
+        //     beast::bind_front_handler(
+        //         &session::on_write,
+        //         shared_from_this()));
+        
+        std::cout << beast::make_printable(buffer_.data()) << std::endl;
     }
 
     void
     on_close(beast::error_code ec)
     {
-        if(ec)
+        if (ec)
             return fail(ec, "close");
 
         // If we get here then the connection is closed gracefully
@@ -227,15 +240,14 @@ public:
 
 //------------------------------------------------------------------------------
 
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
     // Check command line arguments.
-    if(argc != 4)
+    if (argc != 4)
     {
-        std::cerr <<
-            "Usage: websocket-client-async-ssl <host> <port> <text>\n" <<
-            "Example:\n" <<
-            "    websocket-client-async-ssl echo.websocket.org 443 \"Hello, world!\"\n";
+        std::cerr << "Usage: ./websocket-test <host> <port> <text>\n"
+                  << "Example:\n"
+                  << "    ./websocket-test localhost 4443 \"Hello, world!\"\n";
         return EXIT_FAILURE;
     }
     auto const host = argv[1];

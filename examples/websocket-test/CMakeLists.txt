@@ -4,7 +4,7 @@ project(websocket_test)
 message(WARNING "Andrew is awesome")
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
-
+set (CMAKE_CXX_STANDARD 11)
 
 # Lib finder
 find_package(Boost REQUIRED)
