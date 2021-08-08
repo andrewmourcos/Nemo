@@ -1,99 +1,109 @@
 /*
  * Andrew Mourcos
- * Notes: I don't know how the web stuff works yet, this is basically a mirror of https://github.com/boostorg/asio/blob/develop/example/cpp03/http/client/async_client.cpp
- *        which is an example of making get/post requests I guess.
+ * Notes: This won't run until all functions below are filled out.
 */
 
 #include <cstdlib>
 #include <string>
 #include <iostream>
-#include <errno>
+#include <errno.h>
 
 #include "Client.hpp"
 
-#ifdef (__arch64__)
+#if defined(__arch64__)
     #define JETSON
 #endif
 
 using boost::asio::ip::tcp;
 
+typedef enum
+{
+    FISH_EPERM = EPERM,     /* Operation not permitted */
+    FISH_EIO = EIO,         /* I/O error */
+    FISH_EINVAL = EINVAL,   /* Invalid argument */
+    FISH_EOK = 0          /* No error */
+} fish_error_t;
+
+
 /* Checks if mediasoup room exists by sending a simple GET
  * request. Returns errno::EOK if succesful. */
-uint32_t checkRoom()
+fish_error_t checkRoom()
 {
-    return EOK;
+    return FISH_EOK;
 }
 
 /* Logs into webapp using provided credentials. Returns
- * errno:: EOK if succesful */
-uint32_t login()
+ * FISH_EOK if succesful */
+fish_error_t login()
 {
-    return EOK;
+    return FISH_EOK;
 }
 
 /* Creates broadcaster by sending POST with our metadata. 
  * Returns errno::EOK if succesful */
-uint32_t createBroadcaster()
+fish_error_t createBroadcaster()
 {
-    return EOK;
+    return FISH_EOK;
 }
 
 /* Sends HTTP DELETE to remove broadcaster when script 
  * terminates. Returns errno::EOK if succesful. */
-uint32_t cleanup()
+fish_error_t cleanup()
 {
-    return EOK;
+    return FISH_EOK;
 }
 
 /* Send POST to setup RTP over UDP for audio. Parse 
  * JSON response and place in buffer passed by ref.
  * Returns errno::EOK if succesful */
-uint32_t createPlainTransportAudio()
+fish_error_t createPlainTransportAudio()
 {
-    return EOK;
+    return FISH_EOK;
 }
 
 /* Send POST to setup RTP over UDP for video. Parse 
  * JSON response and place in buffer passed by ref.
  * Returns errno::EOK if succesful */
-uint32_t createPlainTransportVideo()
+fish_error_t createPlainTransportVideo()
 {
-    return EOK;
+    return FISH_EOK;
 }
 
 /* Create a mediasoup Producer to send audio by sending 
  * our RTP parameters via a HTTP POST. */
-uint32_t createMediasoupProducerAudio()
+fish_error_t createMediasoupProducerAudio()
 {
-    return EOK;
+    return FISH_EOK;
 }
 
 /* Create a mediasoup Producer to send video by sending 
  * our RTP parameters via a HTTP POST. */
-uint32_t createMediasoupProducerVideo()
+fish_error_t createMediasoupProducerVideo()
 {
-    return EOK;
+    return FISH_EOK;
 }
 
+#if defined(JETSON)
 /* Run gstreamer command to stream from the
  * CSI2 camera. Will not run on non-Jetson hardware. */
-uint32_t createCSI2Stream()
+fish_error_t createCSI2Stream()
 {
-    return EOK;
+    return FISH_EOK;
 }
+#endif
 
 /* Run gstreamer command to stream from the
  * a webcam. */
-uint32_t createWebcamStream()
+fish_error_t createWebcamStream()
 {
-
+    return FISH_EOK;
 }
 
 /* Run asynchronous gstreamer command to stream from a 
  * file. */
-uint32_t createFileStream()
+fish_error_t createFileStream()
 {
-
+    return FISH_EOK;
 }
 
 int main(int argc, char const *argv[])
@@ -102,94 +112,95 @@ int main(int argc, char const *argv[])
         std::cout << "Usage: ./gstreamer_test <server url> <room id> <username> <password>\n";
         std::cout << "Example:\n";
         std::cout << "  ./gstreamer_test https://192.168.0.142:4443 FISH username@gmail.com password123\n";
-        returns 1; 
+        return EXIT_FAILURE; 
     }
 
     uint32_t err;
     err = checkRoom();
-    if (err != EOK) {
+    if (err != FISH_EOK) {
         printf("Error: could not connect to ROOM_ID:____\n");
         return EXIT_FAILURE;
     }
 
     err = login();
-    if (err != EOK) {
+    if (err != FISH_EOK) {
         printf("Error: could not loging with _______\n");
         return EXIT_FAILURE;
     }
 
     err = createBroadcaster();
-    if (err != EOK) {
+    if (err != FISH_EOK) {
         printf("Error: could not create broadcaster\n");
-        err = cleanup()
-        if (err != EOK) {
-            printf("Failed to cleanup broadcaster\n")
+        err = cleanup();
+        if (err != FISH_EOK) {
+            printf("Failed to cleanup broadcaster\n");
         }
         return EXIT_FAILURE;
     }
 
     err = createPlainTransportAudio();
-    if (err != EOK) {
+    if (err != FISH_EOK) {
         printf("Error: could not create PT audio\n");
-        err = cleanup()
-        if (err != EOK) {
-            printf("Failed to cleanup broadcaster\n")
+        err = cleanup();
+        if (err != FISH_EOK) {
+            printf("Failed to cleanup broadcaster\n");
         }
         return EXIT_FAILURE;
     }
 
     err = createPlainTransportVideo();
-    if (err != EOK) {
+    if (err != FISH_EOK) {
         printf("Error: could not create PT video\n");
-        err = cleanup()
-        if (err != EOK) {
-            printf("Failed to cleanup broadcaster\n")
+        err = cleanup();
+        if (err != FISH_EOK) {
+            printf("Failed to cleanup broadcaster\n");
         }
         return EXIT_FAILURE;
     }
 
     err = createMediasoupProducerAudio();
-    if (err != EOK) {
+    if (err != FISH_EOK) {
         printf("Error: could not create MS audio producer\n");
-        err = cleanup()
-        if (err != EOK) {
-            printf("Failed to cleanup broadcaster\n")
+        err = cleanup();
+        if (err != FISH_EOK) {
+            printf("Failed to cleanup broadcaster\n");
         }
         return EXIT_FAILURE;
     }
 
     err = createMediasoupProducerVideo();
-    if (err != EOK) {
+    if (err != FISH_EOK) {
         printf("Error: could not create MS video producer\n");
-        err = cleanup()
-        if (err != EOK) {
-            printf("Failed to cleanup broadcaster\n")
+        err = cleanup();
+        if (err != FISH_EOK) {
+            printf("Failed to cleanup broadcaster\n");
         }
         return EXIT_FAILURE;
     }
 
-#if defined JETSON
+// Only use csi2 function if running on Jetson, otherwise use regular webcam
+#if defined(JETSON)
     err = createCSI2Stream();
-    if (err != EOK) {
+    if (err != FISH_EOK) {
         printf("Error: could not create CSI2 gstream\n");
-        err = cleanup()
-        if (err != EOK) {
-            printf("Failed to cleanup broadcaster\n")
+        err = cleanup();
+        if (err != FISH_EOK) {
+            printf("Failed to cleanup broadcaster\n");
         }
     }
 #else
     err = createWebcamStream();
-    if (err != EOK) {
+    if (err != FISH_EOK) {
         printf("Error: could not create webcam gstream\n");
-        err = cleanup()
-        if (err != EOK) {
-            printf("Failed to cleanup broadcaster\n")
+        err = cleanup();
+        if (err != FISH_EOK) {
+            printf("Failed to cleanup broadcaster\n");
         }
     }
 #endif
-    err = cleanup()
-    if (err != EOK) {
-        printf("Failed to cleanup broadcaster\n")
+    err = cleanup();
+    if (err != FISH_EOK) {
+        printf("Failed to cleanup broadcaster\n");
     }
 
     // ****** Code from boost::asio HTTP request example: *****
@@ -211,6 +222,7 @@ int main(int argc, char const *argv[])
     // {
     //  std::cout << "Exception: " << e.what() << "\n";
     // }
-
-  return 0;
+    
+    printf("Execution finished normally\n");
+    return 0;
 }
