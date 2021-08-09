@@ -13,7 +13,9 @@
 // Note: macro needs to be defined before including httplib
 #define CPPHTTPLIB_OPENSSL_SUPPORT
 #include "httplib.h"
-
+#include <boost/uuid/uuid.hpp>            // uuid class
+#include <boost/uuid/uuid_generators.hpp> // generators
+#include <boost/uuid/uuid_io.hpp>         // streaming operators etc.
 #if defined(__arch64__)
     #define JETSON
 #endif
@@ -80,8 +82,27 @@ fish_error_t login(const char* server_url, const char* username, const char* pas
 
 /* Creates broadcaster by sending POST with our metadata. 
  * Returns errno::EOK if succesful */
-fish_error_t createBroadcaster()
+fish_error_t createBroadcaster(const char* server_url, const char* room_id, std::string &token)
 {
+
+    httplib::Params params;
+    boost::uuids::uuid uuid = boost::uuids::random_generator()();
+    params.emplace("id", uuid);
+    params.emplace("displayName", "Broadcaster");
+    params.emplace("device","{\"name\": \"GStreamer\"}")
+
+    httplib::Client cli(server_url);
+    cli.enable_server_certificate_verification(false);
+
+    auto res = cli.Post("/rooms/" +room_id+ "/broadcasters", params, "Authorization: Bearer " + token);
+
+    if (res->status != 200) {
+        printf("Failed to create broadcaster");
+        return FISH_EIO;
+    }
+
+    printf(">> Created Broadcaster");
+
     return FISH_EOK;
 }
 
@@ -174,7 +195,7 @@ int main(int argc, char const *argv[])
         return EXIT_FAILURE;
     }
 
-    err = createBroadcaster();
+    err = createBroadcaster(server_url, room_id, token);
     if (err != FISH_EOK) {
         printf("Error: could not create broadcaster\n");
         err = cleanup();

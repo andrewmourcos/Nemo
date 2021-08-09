@@ -8,6 +8,7 @@ message(WARNING "Andrew is awesome")
 find_package(Threads REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(jsoncpp REQUIRED)
+find_package(Boost REQUIRED)
 
 # Internal header files
 include_directories("./")
@@ -19,6 +20,8 @@ add_executable(gstreamer_test ${SOURCES})
 # External header files
 # include_directories( ${Boost_INCLUDE_DIRS} )
 include_directories( jsoncpp )
+# External header files
+include_directories( ${Boost_INCLUDE_DIRS} )
 
 # External libraries
 target_link_libraries(gstreamer_test PRIVATE Threads::Threads
