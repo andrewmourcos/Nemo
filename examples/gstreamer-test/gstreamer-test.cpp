@@ -18,12 +18,13 @@
     #define JETSON
 #endif
 
+/* Type definition for error codes. All functions should return one of these. */
 typedef enum
 {
     FISH_EPERM = EPERM,     /* Operation not permitted */
     FISH_EIO = EIO,         /* I/O error */
     FISH_EINVAL = EINVAL,   /* Invalid argument */
-    FISH_EOK = 0          /* No error */
+    FISH_EOK = 0            /* No error */
 } fish_error_t;
 
 /* Checks if mediasoup room exists by sending a simple GET
@@ -243,6 +244,7 @@ int main(int argc, char const *argv[])
         }
     }
 #endif
+
     err = cleanup();
     if (err != FISH_EOK) {
         printf("Failed to cleanup broadcaster\n");
