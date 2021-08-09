@@ -8,13 +8,15 @@
 #include <iostream>
 #include <errno.h>
 
-#include "Client.hpp"
+#include "jsoncpp/json/json.h"
+
+// Note: macro needs to be defined before including httplib
+#define CPPHTTPLIB_OPENSSL_SUPPORT
+#include "httplib.h"
 
 #if defined(__arch64__)
     #define JETSON
 #endif
-
-using boost::asio::ip::tcp;
 
 typedef enum
 {
@@ -24,18 +26,54 @@ typedef enum
     FISH_EOK = 0          /* No error */
 } fish_error_t;
 
-
 /* Checks if mediasoup room exists by sending a simple GET
- * request. Returns errno::EOK if succesful. */
-fish_error_t checkRoom()
+ * request and checking for 200. Returns errno::EOK if succesful. */
+fish_error_t checkRoom(const char *server_url, const char *room_id)
 {
+    std::string room("/rooms/");
+    room += room_id;
+
+    httplib::Client cli(server_url);
+    cli.enable_server_certificate_verification(false);
+
+    auto res = cli.Get(room.c_str());
+
+    if (res->status != 200) {
+        printf("Room not found: %s\n", room.c_str());
+        return FISH_EIO;
+    } else {
+        printf(">> Room found\n");
+    }
+
     return FISH_EOK;
 }
 
-/* Logs into webapp using provided credentials. Returns
- * FISH_EOK if succesful */
-fish_error_t login()
+/* Logs into webapp using provided credentials. Sets token for
+ * future calls. Returns FISH_EOK if succesful */
+fish_error_t login(const char* server_url, const char* username, const char* password, std::string &token)
 {
+    // Set items to send in POST request
+    httplib::Params params;
+    params.emplace("email", username);
+    params.emplace("password", password);
+
+    httplib::Client cli(server_url);
+    cli.enable_server_certificate_verification(false);
+
+    auto res = cli.Post("/api/users/login", params);
+
+    if (res->status != 200) {
+        printf("Failed to login with usr:%s, psw:%s", username, password);
+        return FISH_EIO;
+    }
+
+    Json::Reader reader;
+    Json::Value root;
+    reader.parse(res->body, root);
+    token = root["token"].toStyledString();
+
+    printf(">> Logged in succesfully, token:%s\n", token.c_str());
+
     return FISH_EOK;
 }
 
@@ -114,15 +152,22 @@ int main(int argc, char const *argv[])
         std::cout << "  ./gstreamer_test https://192.168.0.142:4443 FISH username@gmail.com password123\n";
         return EXIT_FAILURE; 
     }
+    
+    fish_error_t err;
+    std::string token;
 
-    uint32_t err;
-    err = checkRoom();
+    const char* server_url = argv[1];
+    const char* room_id = argv[2];
+    const char* username = argv[3];
+    const char* password = argv[4];
+
+    err = checkRoom(server_url, room_id);
     if (err != FISH_EOK) {
         printf("Error: could not connect to ROOM_ID:____\n");
         return EXIT_FAILURE;
     }
 
-    err = login();
+    err = login(server_url, username, password, token);
     if (err != FISH_EOK) {
         printf("Error: could not loging with _______\n");
         return EXIT_FAILURE;
@@ -202,26 +247,6 @@ int main(int argc, char const *argv[])
     if (err != FISH_EOK) {
         printf("Failed to cleanup broadcaster\n");
     }
-
-    // ****** Code from boost::asio HTTP request example: *****
-    // try
-    // {
-    //  if (argc != 3)
-    //  {
-    //      std::cout << "Usage: gstreamer_test <server> <path>\n";
-    //      std::cout << "Example:\n";
-    //      std::cout << "  gstreamer_test www.boost.org /LICENSE_1_0.txt\n";
-    //      return 1;
-    //  }
-
-    //  boost::asio::io_context io_context;
-    //  client c(io_context, argv[1], argv[2]);
-    //  io_context.run();
-    // }
-    // catch (std::exception& e)
-    // {
-    //  std::cout << "Exception: " << e.what() << "\n";
-    // }
     
     printf("Execution finished normally\n");
     return 0;
