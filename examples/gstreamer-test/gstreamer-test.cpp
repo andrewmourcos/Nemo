@@ -84,12 +84,11 @@ fish_error_t login(const char* server_url, const char* username, const char* pas
  * Returns errno::EOK if succesful */
 fish_error_t createBroadcaster(const char* server_url, const char* room_id, std::string &token)
 {
-
     httplib::Params params;
-    boost::uuids::uuid uuid = boost::uuids::random_generator()();
+    boost::uuids::uuid uuid = boost::uuids::random_generator();
     params.emplace("id", uuid);
     params.emplace("displayName", "Broadcaster");
-    params.emplace("device","{\"name\": \"GStreamer\"}")
+    params.emplace("device","{\"name\": \"GStreamer\"}");
 
     httplib::Client cli(server_url);
     cli.enable_server_certificate_verification(false);
