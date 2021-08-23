@@ -12,7 +12,7 @@
 
 #define     SERIAL_MSG_LEN 10 // All servo messages are 8 characters long + 2 chars for whitespace
 #define     VMINX          1
-#define     BAUDRATE       B115200
+#define     BAUDRATE       B38400
 
 /* Type definition for error codes. All functions should return one of these. */
 typedef enum
