@@ -38,6 +38,8 @@ fish_error_t moveServoAsync(serial_handle_t serial, uint8_t angle, uint8_t speed
 /* Waits for response from UART device before returning -- checks for servo errors */
 fish_error_t moveServoSync(serial_handle_t serial, uint8_t angle, uint8_t speed, bool left_servo);
 
+fish_error_t setCaudalFinSpeed(serial_handle_t serial, uint8_t speed_percentage);
+
 int main(int argc, char const *argv[])
 {
     printf(">> Starting serial example ...\n");
@@ -67,6 +69,18 @@ int main(int argc, char const *argv[])
     err = moveServoSync(serial, 180, 100, true);
     err = moveServoSync(serial, 0, 100, false);
     err = moveServoSync(serial, 180, 100, false);
+
+    // Example changing the caudal fin speed
+    err = setCaudalFinSpeed(serial, 0);
+    usleep(500000);
+    err = setCaudalFinSpeed(serial, 50);
+    usleep(500000);
+    err = setCaudalFinSpeed(serial, 100);
+    usleep(1000000);
+    err = setCaudalFinSpeed(serial, 50);
+    usleep(500000);
+    err = setCaudalFinSpeed(serial, 0);
+    usleep(500000);
 
     /* Here we aren't checking the return values. Outside of this quick example, we should always 
      * check these for errors.
@@ -165,6 +179,48 @@ fish_error_t moveServoSync(serial_handle_t serial, uint8_t angle, uint8_t speed,
     } else {
         snprintf(tx_buffer, SERIAL_MSG_LEN, "SR%03d%03d\n", angle, speed);
     }
+    // Clear Rx buffer so we don't read old messages
+    tcflush(serial.fid, TCIFLUSH);
+    num_chars = write(serial.fid, &tx_buffer, SERIAL_MSG_LEN);
+    if (num_chars < 0) {
+        printf("Failed to send command to UART device\n");
+        return FISH_EIO;
+    }
+    sleep(0.001); // Needed to workaround Termios read()/tcflush() bug.
+
+    // Allow up to 20 retries on reading message from device
+    num_chars = 0;
+    while (num_chars < 2 && retries < 20) {
+        num_chars = read (serial.fid, rx_buffer, sizeof rx_buffer);
+    }
+
+    if (num_chars < 0) {
+        printf("UART buffer read failed -- likely timeout\n");
+        return FISH_ETIMEDOUT;
+    } else if (!strcmp(rx_buffer, "S")) {
+        printf("Serial device did not respond with success\n");
+        return FISH_EIO;
+    }
+
+    return FISH_EOK;
+}
+
+/* Description: sends desired speed (as percentage) to the UART device. Blocks until
+ *              it receives a message back from the device.
+ */
+fish_error_t setCaudalFinSpeed(serial_handle_t serial, uint8_t speed_percentage) {
+    char rx_buffer[3]               = {0};
+    char tx_buffer[SERIAL_MSG_LEN]  = {0};
+    int num_chars                   = 0;
+    int retries                     = 0;
+
+    if (speed_percentage < 0 || speed_percentage > 100) {
+        printf("Invalid speed requested, please use percentage (0-100)\n");
+        return FISH_EINVAL;
+    }
+
+    snprintf(tx_buffer, SERIAL_MSG_LEN, "CF%03d\n", speed_percentage);
+
     // Clear Rx buffer so we don't read old messages
     tcflush(serial.fid, TCIFLUSH);
     num_chars = write(serial.fid, &tx_buffer, SERIAL_MSG_LEN);
