@@ -1,3 +1,9 @@
+/*
+    Author: AndrewMourcos
+    Date: Aug 24 2021
+    License: Not for commercial use outside LamperLabs
+*/
+
 #include <iostream>
 #include <stdio.h>
 #include <unistd.h>       // Used for UART
