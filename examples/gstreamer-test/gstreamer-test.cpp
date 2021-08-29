@@ -16,6 +16,12 @@
 #include <boost/uuid/uuid.hpp>            // uuid class
 #include <boost/uuid/uuid_generators.hpp> // generators
 #include <boost/uuid/uuid_io.hpp>         // streaming operators etc.
+
+#include <boost/lexical_cast.hpp>
+#include <boost/uuid/uuid_io.hpp>
+#include <boost/uuid/random_generator.hpp>
+
+
 #if defined(__arch64__)
     #define JETSON
 #endif
@@ -73,7 +79,7 @@ fish_error_t login(const char* server_url, const char* username, const char* pas
     Json::Reader reader;
     Json::Value root;
     reader.parse(res->body, root);
-    token = root["token"].toStyledString();
+    token = root["token"].asString();
 
     printf(">> Logged in succesfully, token:%s\n", token.c_str());
 
@@ -85,15 +91,25 @@ fish_error_t login(const char* server_url, const char* username, const char* pas
 fish_error_t createBroadcaster(const char* server_url, const char* room_id, std::string &token)
 {
     httplib::Params params;
-    boost::uuids::uuid uuid = boost::uuids::random_generator();
-    params.emplace("id", uuid);
+    boost::uuids::uuid uuid = boost::uuids::random_generator()();
+    auto uuidString = boost::lexical_cast<std::string>(uuid);
+    params.emplace("id", uuidString.c_str());
     params.emplace("displayName", "Broadcaster");
     params.emplace("device","{\"name\": \"GStreamer\"}");
 
     httplib::Client cli(server_url);
     cli.enable_server_certificate_verification(false);
+    cli.set_bearer_token_auth(token.c_str());
 
-    auto res = cli.Post("/rooms/" +room_id+ "/broadcasters", params, "Authorization: Bearer " + token);
+    std::string extension("/rooms/");
+    extension += room_id;
+    extension += "/broadcasters";
+
+    cli.set_bearer_token_auth(token.c_str());
+
+    auto res = cli.Post(extension.c_str(), params);
+
+    printf("%s\n", res->reason.c_str());
 
     if (res->status != 200) {
         printf("Failed to create broadcaster");

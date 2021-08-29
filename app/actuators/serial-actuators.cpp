@@ -1,15 +1,20 @@
 #include "../fishIO/fishIO.h"
 #include "serial-actuators.hpp"
 
+#if defined(__arch64__)
+    #define JETSON_TARGET
+#endif
+
 void runActuatorService(fish_handle_t * handle) {
 	fish_error_t err;
 
 	#if defined	(JETSON_TARGET)
 		const char * uart_target = "/dev/ttyTHS1";
 	    serial_handle_t serial;
-	    err = setupSerial(&serial, uart_target)
+	    err = setupSerial(&serial, uart_target);
 	    if (err != FISH_EOK){
-	        return EXIT_FAILURE;
+	    	std::cout << "Failed to instantiate serial connection" << std::endl;
+	        return;
 	    }
 	#endif
 
