@@ -1,4 +1,5 @@
 #include "root_certificates.hpp"
+#include "boost-sock.hpp"
 
 #include <boost/beast/core.hpp>
 #include <boost/beast/ssl.hpp>
@@ -13,7 +14,6 @@
 
 #include "jsoncpp/json/json.h"
 
-
 namespace beast = boost::beast;         // from <boost/beast.hpp>
 namespace http = beast::http;           // from <boost/beast/http.hpp>
 namespace websocket = beast::websocket; // from <boost/beast/websocket.hpp>
@@ -21,39 +21,93 @@ namespace net = boost::asio;            // from <boost/asio.hpp>
 namespace ssl = boost::asio::ssl;       // from <boost/asio/ssl.hpp>
 using tcp = boost::asio::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
 
+static void copyThrottletToHandle(fish_handle_t * handle, Json::Value root) {
+    std::string value;
+    value = root.get("movingForward", "error").asString();
 
-void parseSocketJson(std::string json_string) {
-	Json::Reader reader;
-	Json::Value root;
+    fish_handle_mtx.lock();
+    if (value == "false") {
+        handle->next_speed = 0;
+    } else if (value == "true") {
+        handle->next_speed = root.get("movementSpeed", "0").asInt();
+    }
+    fish_handle_mtx.unlock();
+}
 
-	if (!reader.parse(json_string, root)) {
-		std::cout << "Failed to parse original string json" << std::endl;
-		return;
-	}
+static void copyTurnToHandle(fish_handle_t * handle, Json::Value root) {
+    std::string value;
 
-	std::string message = root["data"]["message"].asString();
+    value = root.get("moveDirection", "error").asString();
+    if (value == "right") {
+        value = root.get("command", "false").asString();
+        fish_handle_mtx.lock();
+        if (value == "false") {
+            // Released key
+            handle->next_right_angle = 90; // Put the servos back straight
+            handle->next_left_angle = 90;
+        } else if (value == "true") {
+            handle->next_right_angle = 90 + root.get("servoAngle", "0").asInt();
+            handle->next_left_angle = 90 - root.get("servoAngle", "0").asInt();
+        }
+         fish_handle_mtx.unlock();
+    } else if (value == "left") {
+        value = root.get("command", "false").asString();
+        fish_handle_mtx.lock();
+        if (value == "false") {
+            // Released key
+            handle->next_right_angle = 90; // Put the servos back straight
+            handle->next_left_angle = 90;
+        } else if (value == "true") {
+            handle->next_right_angle = 90 - root.get("servoAngle", "0").asInt();
+            handle->next_left_angle = 90 + root.get("servoAngle", "0").asInt();
+        }
+        fish_handle_mtx.unlock();
+    }
+}
 
-	if (!reader.parse(message, root) ) {
-		std::cout << "Failed to parse message section of json" << std::endl;
-		return;
-	}
+static void copyStopToHandle(fish_handle_t * handle, Json::Value root) {
+    std::string value;
+    // Mutex button
+    value = root.get("controlled", "error").asString();
+    if (value == "false") {
+        // Put the servos back straight
+        fish_handle_mtx.lock();
+        handle->next_right_angle = 90; 
+        handle->next_left_angle = 90;
+        handle->next_speed = 0;
+        fish_handle_mtx.unlock();
+    }
+}
 
-	if (root.isMember("controlled")) {
-		// Mutex button
-		std::cout << root.get("controlled", "error").asString() << std::endl;
+/* Reads the JSON received from websocket and calls handler to copy to thread-shared buffer */
+fish_error_t parseSocketJson(std::string json_string, fish_handle_t * handle) {
+    Json::Reader reader;
+    Json::Value root;
+    std::string value;
 
-	} else if (root.isMember("movingForward")) {
-		// Forward button
-		std::cout << root.get("movingForward", "error").asString() << std::endl;
-		std::cout << root.get("movementSpeed", "error").asString() << std::endl;
+    if (!reader.parse(json_string, root)) {
+        std::cout << "Failed to parse original string json" << std::endl;
+        return FISH_EIO;
+    }
 
-	} else if (root.isMember("moveDirection")) {
-		// Left/Right button
-		std::cout << root.get("moveDirection", "error").asString() << std::endl;
-		std::cout << root.get("movementSpeed", "error").asString() << std::endl;
-	} else {
-		std::cout << "Unparsed message: " << message << std::endl;
-	}
+    std::string message = root["data"]["message"].asString();
+
+    if (!reader.parse(message, root) ) {
+        std::cout << "Failed to parse message section of json" << std::endl;
+        return FISH_EIO;
+    }
+
+    if (root.isMember("controlled")) {
+        
+    } else if (root.isMember("movingForward")) {
+        copyThrottletToHandle(handle, root);
+    } else if (root.isMember("moveDirection")) {
+        copyTurnToHandle(handle, root);
+    } else {
+        std::cout << "Unparsed message: " << message << std::endl;
+    }
+
+    return FISH_EOK;
 }
 
 // Report a failure
@@ -70,6 +124,7 @@ class session : public std::enable_shared_from_this<session>
     beast::flat_buffer buffer_;
     std::string host_;
     std::string text_;
+    fish_handle_t * handle_;
 
 public:
     // Resolver and socket require an io_context
@@ -78,11 +133,11 @@ public:
     }
 
     // Start the asynchronous operation
-    void run( char const *host, char const *port, char const *text)
+    void run( char const *host, char const *port, fish_handle_t * handle)
     {
         // Save these for later
         host_ = host;
-        text_ = text;
+        handle_ = handle;
 
         // Look up the domain name
         resolver_.async_resolve( host,
@@ -203,12 +258,8 @@ public:
         if (ec)
             return fail(ec, "read");
 
-        // Do stuff with the read data
-        // std::cout << beast::make_printable(buffer_.data()) << std::endl;
-
         std::string msg = beast::buffers_to_string(buffer_.data());
-        
-        parseSocketJson(msg);
+        parseSocketJson(msg, handle_);
 
         // Clear buffer
         buffer_.consume(buffer_.size());
@@ -234,19 +285,7 @@ public:
     }
 };
 
-int main(int argc, char const *argv[])
-{
-	if (argc != 4)
-    {
-        std::cerr << "Usage: ./websocket-test <host> <port> <text>\n"
-                  << "Example:\n"
-                  << "    ./websocket-test localhost 4443 \"Hello, world!\"\n";
-        return EXIT_FAILURE;
-    }
-    auto const host = argv[1];
-    auto const port = argv[2];
-    auto const text = argv[3];
-
+void runWebsocketService(fish_handle_t * handle) {
     // The io_context is required for all I/O
     net::io_context ioc;
 
@@ -256,12 +295,12 @@ int main(int argc, char const *argv[])
     // This holds the root certificate used for verification
     load_root_certificates(ctx);
 
+
+    // TODO: make the port and ip configurable
     // Launch the asynchronous operation
-    std::make_shared<session>(ioc, ctx)->run(host, port, text);
+    std::make_shared<session>(ioc, ctx)->run("192.168.0.142", "4443", handle);
 
     // Run the I/O service. The call will return when
     // the socket is closed.
     ioc.run();
-
-	return 0;
 }

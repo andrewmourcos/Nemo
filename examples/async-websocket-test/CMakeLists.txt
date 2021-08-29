@@ -12,6 +12,7 @@ set (CMAKE_CXX_STANDARD 11)
 find_package(Boost REQUIRED)
 find_package(Threads REQUIRED)
 find_package(OpenSSL REQUIRED)
+find_package(jsoncpp REQUIRED)
 
 # Internal header files
 
@@ -21,11 +22,14 @@ add_executable(websocket_test ${SOURCES})
 
 # External header files
 include_directories( ${Boost_INCLUDE_DIRS} )
+include_directories( jsoncpp )
+
 
 # External libraries
 target_link_libraries(websocket_test PRIVATE Threads::Threads
 											 OpenSSL::SSL 
-											 OpenSSL::Crypto)
+											 OpenSSL::Crypto
+											 jsoncpp)
 
 
 

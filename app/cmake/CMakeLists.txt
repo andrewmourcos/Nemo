@@ -3,14 +3,36 @@ project(nemo)
 
 message(WARNING "Andrew is awesome")
 
-# External header files
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+set (CMAKE_CXX_STANDARD 11)
 
-# External libraries
-
-# Internal header files
-include_directories("../include")
+# Lib finder
+find_package(Boost REQUIRED)
+find_package(Threads REQUIRED)
+find_package(OpenSSL REQUIRED)
+find_package(jsoncpp REQUIRED)
 
 # Internal source files
-file(GLOB SOURCES "../src/*.cpp")
+file(GLOB SOURCES "../*.cpp")
 
-add_executable(nemo ${SOURCES})
+
+# Internal header files
+include_directories("../common")
+include_directories("../fishIO")
+include_directories("../socks")
+include_directories("../actuators")
+
+# External header files
+include_directories( ${Boost_INCLUDE_DIRS} )
+include_directories( jsoncpp )
+
+add_executable(nemo ${SOURCES} 
+					"../socks/boost-sock.cpp"
+					"../actuators/serial-actuators.cpp"
+					"../fishIO/fishIO.cpp")
+
+# External libraries
+target_link_libraries(nemo PRIVATE Threads::Threads
+								   OpenSSL::SSL 
+								   OpenSSL::Crypto
+								   jsoncpp)
