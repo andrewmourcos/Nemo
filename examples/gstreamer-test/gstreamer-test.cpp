@@ -1,6 +1,7 @@
 /*
- * Andrew Mourcos
- * Notes: This won't run until all functions below are filled out.
+ * TODO:
+ *      - implement gstreamer function(s)
+ *      - create a handle structure to pass in functions instead of having a ton of parameters
 */
 
 #include <cstdlib>
@@ -88,73 +89,256 @@ fish_error_t login(const char* server_url, const char* username, const char* pas
 
 /* Creates broadcaster by sending POST with our metadata. 
  * Returns errno::EOK if succesful */
-fish_error_t createBroadcaster(const char* server_url, const char* room_id, std::string &token)
+fish_error_t createBroadcaster(const char* server_url, const char* room_id, std::string token, std::string &broadcaster_id)
 {
-    httplib::Params params;
     boost::uuids::uuid uuid = boost::uuids::random_generator()();
-    auto uuidString = boost::lexical_cast<std::string>(uuid);
-    params.emplace("id", uuidString.c_str());
-    params.emplace("displayName", "Broadcaster");
-    params.emplace("device","{\"name\": \"GStreamer\"}");
+    broadcaster_id = boost::lexical_cast<std::string>(uuid);
 
     httplib::Client cli(server_url);
     cli.enable_server_certificate_verification(false);
     cli.set_bearer_token_auth(token.c_str());
 
+    char json_msg[512];
+    sprintf(json_msg, "                             \
+        {                                           \
+          \"id\": \"%s\",                           \
+          \"displayName\": \"Broadcaster\",         \
+          \"device\": {\"name\": \"GStreamer\"}     \
+        }", broadcaster_id.c_str());
+
     std::string extension("/rooms/");
     extension += room_id;
     extension += "/broadcasters";
-
-    cli.set_bearer_token_auth(token.c_str());
-
-    auto res = cli.Post(extension.c_str(), params);
-
-    printf("%s\n", res->reason.c_str());
-
+    
+    auto res = cli.Post(extension.c_str(), json_msg, "application/json");
     if (res->status != 200) {
         printf("Failed to create broadcaster");
         return FISH_EIO;
     }
 
-    printf(">> Created Broadcaster");
+    printf(">> Created Broadcaster\n");
 
     return FISH_EOK;
 }
 
 /* Sends HTTP DELETE to remove broadcaster when script 
  * terminates. Returns errno::EOK if succesful. */
-fish_error_t cleanup()
+fish_error_t cleanup(const char * server_url, const char * room_id, std::string token, std::string broadcaster_id)
 {
+    std::string extension("/rooms/");
+    extension += room_id;
+    extension += "/broadcasters/";
+    extension += broadcaster_id;
+
+    httplib::Client cli(server_url);
+    cli.enable_server_certificate_verification(false);
+    cli.set_bearer_token_auth(token.c_str());
+
+    auto res = cli.Delete(extension.c_str());
+    if (res->status != 200) {
+        printf("Failed to delete broadcaster");
+        return FISH_EIO;
+    }
+    printf(">> Deleted Broadcaster\n");
     return FISH_EOK;
 }
 
 /* Send POST to setup RTP over UDP for audio. Parse 
  * JSON response and place in buffer passed by ref.
  * Returns errno::EOK if succesful */
-fish_error_t createPlainTransportAudio()
+fish_error_t createPlainTransportAudio(const char * server_url, const char * room_id, 
+                                        std::string token, std::string broadcaster_id,
+                                        std::string &audio_transport_id, 
+                                        std::string &audio_transport_ip,
+                                        std::string &audio_transport_port,
+                                        std::string &audio_transport_rtcp_port)
 {
+    std::string extension("/rooms/");
+    extension += room_id;
+    extension += "/broadcasters/";
+    extension += broadcaster_id;
+    extension += "/transports";
+
+    httplib::Client cli(server_url);
+    cli.enable_server_certificate_verification(false);
+    cli.set_bearer_token_auth(token.c_str());
+
+    char json_msg[512] = "          \
+        {                           \
+          \"type\": \"plain\",      \
+          \"comedia\": true,        \
+          \"rtcpMux\": false        \
+        }";
+
+    auto res = cli.Post(extension.c_str(), json_msg, "application/json");
+    if (res->status != 200) {
+        printf("Failed to create plain transport audio");
+        return FISH_EIO;
+    }
+
+    // Parse the JSON response to get the ID, IP, port and RTCP port
+    // TODO: add error checking to the JSON indexing below
+    Json::Reader reader;
+    Json::Value root;
+    reader.parse(res->body, root);
+    audio_transport_id          = root["id"].asString();
+    audio_transport_ip          = root["ip"].asString();
+    audio_transport_port        = root["port"].asString();
+    audio_transport_rtcp_port   = root["rtcpPort"].asString();
+
+    printf(">> Created audio plain transport\n");
+
     return FISH_EOK;
 }
 
 /* Send POST to setup RTP over UDP for video. Parse 
  * JSON response and place in buffer passed by ref.
  * Returns errno::EOK if succesful */
-fish_error_t createPlainTransportVideo()
+fish_error_t createPlainTransportVideo(const char * server_url, const char * room_id, 
+                                        std::string token, std::string broadcaster_id,
+                                        std::string &video_transport_id, 
+                                        std::string &video_transport_ip,
+                                        std::string &video_transport_port,
+                                        std::string &video_transport_rtcp_port)
 {
+    std::string extension("/rooms/");
+    extension += room_id;
+    extension += "/broadcasters/";
+    extension += broadcaster_id;
+    extension += "/transports";
+
+    httplib::Client cli(server_url);
+    cli.enable_server_certificate_verification(false);
+    cli.set_bearer_token_auth(token.c_str());
+
+    char json_msg[512] = "          \
+        {                           \
+          \"type\": \"plain\",      \
+          \"comedia\": true,        \
+          \"rtcpMux\": false        \
+        }";
+
+    auto res = cli.Post(extension.c_str(), json_msg, "application/json");
+    if (res->status != 200) {
+        printf("Failed to create plain transport audio");
+        return FISH_EIO;
+    }
+
+    // Parse the JSON response to get the ID, IP, port and RTCP port
+    // TODO: add error checking to the JSON indexing below
+    Json::Reader reader;
+    Json::Value root;
+    reader.parse(res->body, root);
+    video_transport_id          = root["id"].asString();
+    video_transport_ip          = root["ip"].asString();
+    video_transport_port        = root["port"].asString();
+    video_transport_rtcp_port   = root["rtcpPort"].asString();
+
+    printf(">> Created video plain transport\n");
     return FISH_EOK;
 }
 
 /* Create a mediasoup Producer to send audio by sending 
  * our RTP parameters via a HTTP POST. */
-fish_error_t createMediasoupProducerAudio()
+fish_error_t createMediasoupProducerAudio(const char * server_url, const char * room_id, 
+                                          std::string token, std::string broadcaster_id,
+                                          std::string audio_transport_id)
 {
+    std::string extension("/rooms/");
+    extension += room_id;
+    extension += "/broadcasters/";
+    extension += broadcaster_id;
+    extension += "/transports/";
+    extension += audio_transport_id;
+    extension += "/producers";
+
+    httplib::Client cli(server_url);
+    cli.enable_server_certificate_verification(false);
+    cli.set_bearer_token_auth(token.c_str());
+
+    char json_msg[1024] = "\
+        {\
+            \"kind\": \"audio\",\
+            \"rtpParameters\": {\
+                \"codecs\": [\
+                    {\
+                        \"mimeType\": \"audio/opus\",\
+                        \"payloadType\": 100,\
+                        \"clockRate\": 48000,\
+                        \"channels\": 2,\
+                        \"parameters\": {\
+                            \"sprop-stereo\": 1\
+                        }\
+                    }\
+                ],\
+                \"encodings\": [\
+                    {\
+                        \"ssrc\": 1111\
+                    }\
+                ]\
+            }\
+        }";
+
+    auto res = cli.Post(extension.c_str(), json_msg, "application/json");
+    if (res->status != 200) {
+        printf("Failed to create mediasoup audio producer");
+        return FISH_EIO;
+    }
+
+    printf(">> Created audio producer\n");
     return FISH_EOK;
 }
 
 /* Create a mediasoup Producer to send video by sending 
  * our RTP parameters via a HTTP POST. */
-fish_error_t createMediasoupProducerVideo()
+fish_error_t createMediasoupProducerVideo(const char * server_url, const char * room_id, 
+                                          std::string token, std::string broadcaster_id,
+                                          std::string video_transport_id)
 {
+    std::string extension("/rooms/");
+    extension += room_id;
+    extension += "/broadcasters/";
+    extension += broadcaster_id;
+    extension += "/transports/";
+    extension += video_transport_id;
+    extension += "/producers";
+
+    httplib::Client cli(server_url);
+    cli.enable_server_certificate_verification(false);
+    cli.set_bearer_token_auth(token.c_str());
+
+    char json_msg[1024] = "\
+        {\
+            \"kind\": \"video\",\
+            \"rtpParameters\": {\
+                \"codecs\": [\
+                    {\
+                        \"mimeType\": \"video/h264\",\
+                        \"payloadType\": 100,\
+                        \"clockRate\": 90000,\
+                        \"parameters\": {\
+                            \"packetization-mode\":1,\
+                            \"profile-level-id\": \"42e01f\",\
+                            \"level-asymmetry-allowed\":1,\
+                            \"x-google-start-bitrate\":1000\
+                        }\
+                    }\
+                ],\
+                \"encodings\": [\
+                    {\
+                        \"ssrc\": 2222\
+                    }\
+                ]\
+            }\
+        }";
+
+    auto res = cli.Post(extension.c_str(), json_msg, "application/json");
+    if (res->status != 200) {
+        printf("Failed to create mediasoup audio producer");
+        return FISH_EIO;
+    }
+
+    printf(">> Created video producer\n");
     return FISH_EOK;
 }
 
@@ -192,6 +376,15 @@ int main(int argc, char const *argv[])
     
     fish_error_t err;
     std::string token;
+    std::string broadcaster_id;
+    std::string video_transport_id;
+    std::string video_transport_ip;
+    std::string video_transport_port;
+    std::string video_transport_rtcp_port;
+    std::string audio_transport_id;
+    std::string audio_transport_ip;
+    std::string audio_transport_port;
+    std::string audio_transport_rtcp_port;
 
     const char* server_url = argv[1];
     const char* room_id = argv[2];
@@ -210,50 +403,56 @@ int main(int argc, char const *argv[])
         return EXIT_FAILURE;
     }
 
-    err = createBroadcaster(server_url, room_id, token);
+    err = createBroadcaster(server_url, room_id, token, broadcaster_id);
     if (err != FISH_EOK) {
         printf("Error: could not create broadcaster\n");
-        err = cleanup();
+        err = cleanup(server_url, room_id, token, broadcaster_id);
         if (err != FISH_EOK) {
             printf("Failed to cleanup broadcaster\n");
         }
         return EXIT_FAILURE;
     }
 
-    err = createPlainTransportAudio();
+    err = createPlainTransportAudio(server_url, room_id, token, broadcaster_id,
+                                    audio_transport_id, audio_transport_ip,
+                                    audio_transport_port, audio_transport_rtcp_port);
     if (err != FISH_EOK) {
         printf("Error: could not create PT audio\n");
-        err = cleanup();
+        err = cleanup(server_url, room_id, token, broadcaster_id);
         if (err != FISH_EOK) {
             printf("Failed to cleanup broadcaster\n");
         }
         return EXIT_FAILURE;
     }
 
-    err = createPlainTransportVideo();
+    err = createPlainTransportVideo(server_url, room_id, token, broadcaster_id,
+                                    video_transport_id, video_transport_ip,
+                                    video_transport_port, video_transport_rtcp_port);
     if (err != FISH_EOK) {
         printf("Error: could not create PT video\n");
-        err = cleanup();
+        err = cleanup(server_url, room_id, token, broadcaster_id);
         if (err != FISH_EOK) {
             printf("Failed to cleanup broadcaster\n");
         }
         return EXIT_FAILURE;
     }
 
-    err = createMediasoupProducerAudio();
+    err = createMediasoupProducerAudio(server_url, room_id, token, broadcaster_id,
+                                       audio_transport_id);
     if (err != FISH_EOK) {
         printf("Error: could not create MS audio producer\n");
-        err = cleanup();
+        err = cleanup(server_url, room_id, token, broadcaster_id);
         if (err != FISH_EOK) {
             printf("Failed to cleanup broadcaster\n");
         }
         return EXIT_FAILURE;
     }
 
-    err = createMediasoupProducerVideo();
+    err = createMediasoupProducerVideo(server_url, room_id, token, broadcaster_id,
+                                       video_transport_id);
     if (err != FISH_EOK) {
         printf("Error: could not create MS video producer\n");
-        err = cleanup();
+        err = cleanup(server_url, room_id, token, broadcaster_id);
         if (err != FISH_EOK) {
             printf("Failed to cleanup broadcaster\n");
         }
@@ -265,7 +464,7 @@ int main(int argc, char const *argv[])
     err = createCSI2Stream();
     if (err != FISH_EOK) {
         printf("Error: could not create CSI2 gstream\n");
-        err = cleanup();
+        err = cleanup(server_url, room_id, token, broadcaster_id);
         if (err != FISH_EOK) {
             printf("Failed to cleanup broadcaster\n");
         }
@@ -274,14 +473,14 @@ int main(int argc, char const *argv[])
     err = createWebcamStream();
     if (err != FISH_EOK) {
         printf("Error: could not create webcam gstream\n");
-        err = cleanup();
+        err = cleanup(server_url, room_id, token, broadcaster_id);
         if (err != FISH_EOK) {
             printf("Failed to cleanup broadcaster\n");
         }
     }
 #endif
 
-    err = cleanup();
+    err = cleanup(server_url, room_id, token, broadcaster_id);
     if (err != FISH_EOK) {
         printf("Failed to cleanup broadcaster\n");
     }
