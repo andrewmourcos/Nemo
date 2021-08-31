@@ -10,6 +10,7 @@
 #include <errno.h>
 
 #include "jsoncpp/json/json.h"
+#include <opencv2/opencv.hpp>
 
 // Note: macro needs to be defined before including httplib
 #define CPPHTTPLIB_OPENSSL_SUPPORT
@@ -17,7 +18,6 @@
 #include <boost/uuid/uuid.hpp>            // uuid class
 #include <boost/uuid/uuid_generators.hpp> // generators
 #include <boost/uuid/uuid_io.hpp>         // streaming operators etc.
-
 #include <boost/lexical_cast.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/uuid/random_generator.hpp>
@@ -351,17 +351,85 @@ fish_error_t createCSI2Stream()
 }
 #endif
 
+/*
+gst-launch-1.0 \
+    rtpbin name=rtpbin \
+    filesrc location=${MEDIA_FILE} \
+    ! qtdemux name=demux \
+    demux.video_0 \
+    ! queue \
+    ! decodebin \
+    ! videoconvert \
+    ! vp8enc target-bitrate=1000000 deadline=1 cpu-used=4 \
+    ! rtpvp8pay pt=${VIDEO_PT} ssrc=${VIDEO_SSRC} picture-id-mode=2 \
+    ! rtpbin.send_rtp_sink_0 \
+    rtpbin.send_rtp_src_0 ! udpsink host=${videoTransportIp} port=${videoTransportPort} \
+    rtpbin.send_rtcp_src_0 ! udpsink host=${videoTransportIp} port=${videoTransportRtcpPort} sync=false async=false \
+    
+    demux.audio_0 \
+    ! queue \
+    ! decodebin \
+    ! audioresample \
+    ! audioconvert \
+    ! opusenc \
+    ! rtpopuspay pt=${AUDIO_PT} ssrc=${AUDIO_SSRC} \
+    ! rtpbin.send_rtp_sink_1 \
+    rtpbin.send_rtp_src_1 ! udpsink host=${audioTransportIp} port=${audioTransportPort} \
+    rtpbin.send_rtcp_src_1 ! udpsink host=${audioTransportIp} port=${audioTransportRtcpPort} sync=false async=false
+
+*/
+
+
+
 /* Run gstreamer command to stream from the
  * a webcam. */
-fish_error_t createWebcamStream()
+fish_error_t videoStreamFile(std::string video_transport_ip, std::string video_transport_port, std::string video_transport_rtcp_port)
 {
-    return FISH_EOK;
-}
+    cv::VideoCapture cap("/mnt/c/Users/Andrew/Videos/InVision-Website-Home-Video-4-5-21.mp4");
+    if (!cap.isOpened()) {
+        std::cerr <<"VideoCapture not opened" << std::endl;
+        return FISH_EINVAL;
+    }
 
-/* Run asynchronous gstreamer command to stream from a 
- * file. */
-fish_error_t createFileStream()
-{
+    int width = cap.get(cv::CAP_PROP_FRAME_WIDTH);
+    int height = cap.get(cv::CAP_PROP_FRAME_HEIGHT);
+
+    char gstcmd_buf[512];
+    sprintf(gstcmd_buf, " \
+            rtpbin name=rtpbin rtp-profile=avpf \
+            appsrc \
+            ! videoconvert \
+            ! video/x-raw,format=I420,framerate=30/1 \
+            ! x264enc tune=zerolatency speed-preset=1 dct8x8=true quantizer=23 pass=qual \
+            ! rtph264pay pt=100 ssrc=2222 \
+            ! rtpbin.send_rtp_sink_0 \
+            rtpbin.send_rtp_src_0 ! udpsink host=%s port=%s \
+            rtpbin.send_rtcp_src_0 ! udpsink host=%s port=%s sync=false async=false \
+        ", video_transport_ip.c_str(), video_transport_port.c_str(), video_transport_ip.c_str(), video_transport_rtcp_port.c_str());
+
+    cv::VideoWriter writer(
+        gstcmd_buf, 
+        0,      // fourcc 
+        30,     // fps
+        cv::Size(width, height), 
+        true);  // isColor
+
+    if (!writer.isOpened()) {
+        std::cerr <<"VideoWriter not opened"<<std::endl;
+        return FISH_EIO;
+    }
+    printf(">> Streaming video from file\n");
+    
+    bool incoming_frame;
+    while (true) {
+        cv::Mat frame;
+        incoming_frame = cap.read(frame);
+        if (!incoming_frame) {
+            break;
+        }
+        writer.write(frame);
+    }
+
     return FISH_EOK;
 }
 
@@ -393,13 +461,13 @@ int main(int argc, char const *argv[])
 
     err = checkRoom(server_url, room_id);
     if (err != FISH_EOK) {
-        printf("Error: could not connect to ROOM_ID:____\n");
+        printf("Error: could not connect to ROOM_ID:%s\n", room_id);
         return EXIT_FAILURE;
     }
 
     err = login(server_url, username, password, token);
     if (err != FISH_EOK) {
-        printf("Error: could not loging with _______\n");
+        printf("Error: could not login with %s, %s\n", username, password);
         return EXIT_FAILURE;
     }
 
@@ -470,7 +538,7 @@ int main(int argc, char const *argv[])
         }
     }
 #else
-    err = createWebcamStream();
+    err = videoStreamFile(video_transport_ip, video_transport_port, video_transport_rtcp_port);
     if (err != FISH_EOK) {
         printf("Error: could not create webcam gstream\n");
         err = cleanup(server_url, room_id, token, broadcaster_id);
