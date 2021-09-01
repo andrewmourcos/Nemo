@@ -11,6 +11,7 @@
 
 #include "jsoncpp/json/json.h"
 #include <opencv2/opencv.hpp>
+#include <gst/gst.h>
 
 // Note: macro needs to be defined before including httplib
 #define CPPHTTPLIB_OPENSSL_SUPPORT
@@ -23,7 +24,7 @@
 #include <boost/uuid/random_generator.hpp>
 
 
-#if defined(__arch64__)
+#if defined(__aarch64__)
     #define JETSON
 #endif
 
@@ -345,40 +346,107 @@ fish_error_t createMediasoupProducerVideo(const char * server_url, const char * 
 #if defined(JETSON)
 /* Run gstreamer command to stream from the
  * CSI2 camera. Will not run on non-Jetson hardware. */
-fish_error_t createCSI2Stream()
+fish_error_t createCSI2Stream(std::string video_transport_ip, std::string video_transport_port, std::string video_transport_rtcp_port)
 {
+    GstElement *pipeline;
+    GstBus *bus;
+    GstMessage *msg;
+
+    char gstcmd_buf[1024];
+
+    // Works with delay:
+    sprintf(gstcmd_buf, "rtpbin name=rtpbin rtp-profile=avpf \
+                         nvarguscamerasrc ! video/x-raw(memory:NVMM), \
+                         format=NV12, width=852, height=480 \
+                         ! nvv4l2h264enc insert-sps-pps=true ! h264parse \
+                         ! rtph264pay ssrc=2222 pt=100 \
+                         ! rtprtxqueue max-size-time=2000 max-size-packets=0 \
+                         ! rtpbin.send_rtp_sink_0 \
+                         rtpbin.send_rtp_src_0 ! udpsink  host=%s port=%s \
+                         rtpbin.send_rtcp_src_0 ! udpsink  host=%s port=%s sync=false async=false \
+                    ", video_transport_ip.c_str(), video_transport_port.c_str(), 
+                       video_transport_ip.c_str(), video_transport_rtcp_port.c_str());
+
+    /* Build the pipeline */
+    pipeline = gst_parse_launch(gstcmd_buf, NULL);
+
+    /* Start playing */
+    gst_element_set_state(pipeline, GST_STATE_PLAYING);
+
+    /* Wait until error or EOS */
+    bus = gst_element_get_bus(pipeline);
+    msg =
+      gst_bus_timed_pop_filtered(bus, GST_CLOCK_TIME_NONE,
+      (GstMessageType) (GST_MESSAGE_ERROR | GST_MESSAGE_EOS));
+
+    /* Free resources */
+    if (msg != NULL) {
+        gst_message_unref (msg);
+    }
+
+    gst_object_unref (bus);
+    gst_element_set_state (pipeline, GST_STATE_NULL);
+    gst_object_unref (pipeline);
+
     return FISH_EOK;
 }
-#endif
 
-/*
-gst-launch-1.0 \
-    rtpbin name=rtpbin \
-    filesrc location=${MEDIA_FILE} \
-    ! qtdemux name=demux \
-    demux.video_0 \
-    ! queue \
-    ! decodebin \
-    ! videoconvert \
-    ! vp8enc target-bitrate=1000000 deadline=1 cpu-used=4 \
-    ! rtpvp8pay pt=${VIDEO_PT} ssrc=${VIDEO_SSRC} picture-id-mode=2 \
-    ! rtpbin.send_rtp_sink_0 \
-    rtpbin.send_rtp_src_0 ! udpsink host=${videoTransportIp} port=${videoTransportPort} \
-    rtpbin.send_rtcp_src_0 ! udpsink host=${videoTransportIp} port=${videoTransportRtcpPort} sync=false async=false \
+fish_error_t createCSI2ProcessedStream(std::string video_transport_ip, std::string video_transport_port, std::string video_transport_rtcp_port)
+{
+    cv::VideoCapture cap("nvarguscamerasrc ! video/x-raw(memory:NVMM), width=(int)1280, height=(int)720, format=(string)NV12, framerate=(fraction)120/1 \
+                        ! nvvidconv ! video/x-raw,format=(string)BGRx \
+                        ! videoconvert ! video/x-raw, format=(string)BGR ! appsink");
+
+    if (!cap.isOpened()) {
+        std::cerr <<"VideoCapture not opened" << std::endl;
+        return FISH_EINVAL;
+    }
+
+    int width = cap.get(cv::CAP_PROP_FRAME_WIDTH);
+    int height = cap.get(cv::CAP_PROP_FRAME_HEIGHT);
+
+    char gstcmd_buf[1024];
+
+    // Works with delay:
+    sprintf(gstcmd_buf, "rtpbin name=rtpbin rtp-profile=avpf \
+                         appsrc \
+                         ! videoconvert \
+                         ! video/x-raw,format=I420,framerate=120/1 \
+                         ! x264enc tune=zerolatency speed-preset=1 dct8x8=true quantizer=23 pass=qual \
+                         ! rtph264pay pt=100 ssrc=2222 \
+                         ! rtpbin.send_rtp_sink_0 \
+                         rtpbin.send_rtp_src_0 ! udpsink host=%s port=%s \
+                         rtpbin.send_rtcp_src_0 ! udpsink host=%s port=%s sync=false async=false \
+                    ", video_transport_ip.c_str(), video_transport_port.c_str(), 
+                       video_transport_ip.c_str(), video_transport_rtcp_port.c_str());
+
+    cv::VideoWriter writer( gstcmd_buf, 
+                            0,      // fourcc 
+                            120,     // fps
+                            cv::Size(width, height), 
+                            true);  // isColor
+
+    if (!writer.isOpened()) {
+        std::cerr <<"VideoWriter not opened"<<std::endl;
+        return FISH_EIO;
+    }
+    printf(">> Streaming video from file\n");
     
-    demux.audio_0 \
-    ! queue \
-    ! decodebin \
-    ! audioresample \
-    ! audioconvert \
-    ! opusenc \
-    ! rtpopuspay pt=${AUDIO_PT} ssrc=${AUDIO_SSRC} \
-    ! rtpbin.send_rtp_sink_1 \
-    rtpbin.send_rtp_src_1 ! udpsink host=${audioTransportIp} port=${audioTransportPort} \
-    rtpbin.send_rtcp_src_1 ! udpsink host=${audioTransportIp} port=${audioTransportRtcpPort} sync=false async=false
+    bool incoming_frame;
+    while (true) {
+        cv::Mat frame;
+        incoming_frame = cap.read(frame);
+        if (!incoming_frame) {
+            break;
+        }
+        /* Process image here if desired */
+        writer.write(frame);
+    }
 
-*/
+    return FISH_EOK;
 
+}
+#endif
 
 
 /* Run gstreamer command to stream from the
@@ -394,18 +462,18 @@ fish_error_t videoStreamFile(std::string video_transport_ip, std::string video_t
     int width = cap.get(cv::CAP_PROP_FRAME_WIDTH);
     int height = cap.get(cv::CAP_PROP_FRAME_HEIGHT);
 
-    char gstcmd_buf[512];
-    sprintf(gstcmd_buf, " \
-            rtpbin name=rtpbin rtp-profile=avpf \
-            appsrc \
-            ! videoconvert \
-            ! video/x-raw,format=I420,framerate=30/1 \
-            ! x264enc tune=zerolatency speed-preset=1 dct8x8=true quantizer=23 pass=qual \
-            ! rtph264pay pt=100 ssrc=2222 \
-            ! rtpbin.send_rtp_sink_0 \
-            rtpbin.send_rtp_src_0 ! udpsink host=%s port=%s \
-            rtpbin.send_rtcp_src_0 ! udpsink host=%s port=%s sync=false async=false \
-        ", video_transport_ip.c_str(), video_transport_port.c_str(), video_transport_ip.c_str(), video_transport_rtcp_port.c_str());
+    char gstcmd_buf[600];
+    sprintf(gstcmd_buf, "rtpbin name=rtpbin rtp-profile=avpf \
+                         appsrc \
+                         ! videoconvert \
+                         ! video/x-raw,format=I420,framerate=30/1 \
+                         ! x264enc tune=zerolatency speed-preset=1 dct8x8=true quantizer=23 pass=qual \
+                         ! rtph264pay pt=100 ssrc=2222 \
+                         ! rtpbin.send_rtp_sink_0 \
+                         rtpbin.send_rtp_src_0 ! udpsink host=%s port=%s \
+                         rtpbin.send_rtcp_src_0 ! udpsink host=%s port=%s sync=false async=false \
+                    ", video_transport_ip.c_str(), video_transport_port.c_str(), 
+                       video_transport_ip.c_str(), video_transport_rtcp_port.c_str());
 
     cv::VideoWriter writer(
         gstcmd_buf, 
@@ -433,7 +501,7 @@ fish_error_t videoStreamFile(std::string video_transport_ip, std::string video_t
     return FISH_EOK;
 }
 
-int main(int argc, char const *argv[])
+int main(int argc, char *argv[])
 {
     if (argc != 5) {
         std::cout << "Usage: ./gstreamer_test <server url> <room id> <username> <password>\n";
@@ -458,6 +526,9 @@ int main(int argc, char const *argv[])
     const char* room_id = argv[2];
     const char* username = argv[3];
     const char* password = argv[4];
+
+    /* Initialize GStreamer */
+    gst_init (&argc, &argv);
 
     err = checkRoom(server_url, room_id);
     if (err != FISH_EOK) {
@@ -529,7 +600,7 @@ int main(int argc, char const *argv[])
 
 // Only use csi2 function if running on Jetson, otherwise use regular webcam
 #if defined(JETSON)
-    err = createCSI2Stream();
+    err = createCSI2Stream(video_transport_ip, video_transport_port, video_transport_rtcp_port);
     if (err != FISH_EOK) {
         printf("Error: could not create CSI2 gstream\n");
         err = cleanup(server_url, room_id, token, broadcaster_id);

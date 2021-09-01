@@ -15,6 +15,10 @@ find_package(OpenSSL REQUIRED)
 find_package(jsoncpp REQUIRED)
 find_package(OpenCV REQUIRED)
 
+find_package(PkgConfig)
+pkg_check_modules(GSTREAMER REQUIRED gstreamer-1.0)
+
+
 # Internal header files
 include_directories("./")
 
@@ -25,13 +29,20 @@ add_executable(gstreamer_test ${SOURCES})
 # External header files
 include_directories( jsoncpp )
 include_directories( ${OpenCV_INCLUDE_DIRS} )
+include_directories( ${GLIB_INCLUDE_DIRS}
+					 ${GSTREAMER_INCLUDE_DIRS} )
 
 # External header files
 include_directories( ${Boost_INCLUDE_DIRS} )
 
 # External libraries
+link_directories(
+        ${GLIB_LIBRARY_DIRS}
+        ${GSTREAMER_LIBRARY_DIRS}
+)
 target_link_libraries(gstreamer_test PRIVATE Threads::Threads
 											 OpenSSL::SSL 
 											 OpenSSL::Crypto
 											 jsoncpp
-											 ${OpenCV_LIBS})
+											 ${OpenCV_LIBS}
+											 ${GSTREAMER_LIBRARIES})
