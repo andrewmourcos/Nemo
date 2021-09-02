@@ -298,7 +298,7 @@ void runWebsocketService(fish_handle_t * handle) {
 
     // TODO: make the port and ip configurable
     // Launch the asynchronous operation
-    std::make_shared<session>(ioc, ctx)->run("192.168.0.142", "4443", handle);
+    std::make_shared<session>(ioc, ctx)->run(handle->host, handle->port, handle);
 
     // Run the I/O service. The call will return when
     // the socket is closed.

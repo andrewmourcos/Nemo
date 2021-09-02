@@ -1,7 +1,7 @@
 #include "../fishIO/fishIO.h"
 #include "serial-actuators.hpp"
 
-#if defined(__arch64__)
+#if defined(__aarch64__)
     #define JETSON_TARGET
 #endif
 

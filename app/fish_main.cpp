@@ -4,28 +4,63 @@
     License: Not for commercial use outside LamperLabs
 */
 
+#include "streaming/gst-streamer.hpp"
 #include "actuators/serial-actuators.hpp"
 #include "socks/boost-sock.hpp"
 #include "common/fish_types.h"
+#include <gst/gst.h>
+#include "fishStream/fishGST.hpp" // bad practice, but included to allow us to use cleanupBroadcaster
 
 #include <thread>
 #include <iostream> // cout
+#include <signal.h> // Catching ctrl-c
 
 std::mutex fish_handle_mtx;
+fish_handle_t handle = {90, 90, 90, 90, 0, 0};
 
-int main(int argc, char const *argv[])
+void sigint_handler(int s) {
+	cleanupBroadcaster(handle.server_url, handle.room_id, handle.token, handle.broadcaster_id);
+	exit(0);
+}
+
+int main(int argc, char *argv[])
 {
-	fish_handle_t handle = {90, 90, 90, 90, 0, 0};
+	signal (SIGINT, sigint_handler);
+
+	if (argc != 7) {
+        std::cout << "Usage: ./nemo <server url> <room id> <username> <password> <host> <port>\n";
+        std::cout << "Example:\n";
+        std::cout << "  ./nemo https://192.168.0.142:4443 FISH username@gmail.com password123 192.168.0.142 4443\n";
+        return EXIT_FAILURE; 
+    }
+
+	const char* server_url = argv[1];
+    const char* room_id = argv[2];
+    const char* username = argv[3];
+    const char* password = argv[4];
+    const char* host = argv[5]; // too lazy to split up server_url
+    const char* port = argv[6];
+
+    handle.server_url = server_url;
+    handle.room_id = room_id;
+    handle.username = username;
+    handle.password = password;
+    handle.host = host;
+    handle.port = port;
+	
+	gst_init(&argc, &argv);
 
 	// Spawn camera thread
+	std::thread video_thread(runVideoService, &handle);
 
-	// Spawn websocket listener
+	// // Spawn websocket listener
 	std::thread websocket_thread(runWebsocketService, &handle);
 
-	// Spawn motor controller
+	// // Spawn motor controller
 	std::thread motor_controller_thread(runActuatorService, &handle);
 
-	// Warning: There is no guarantee on the join order, so it may never end
+	// // Warning: There is no guarantee on the join order, so it may never end
+	video_thread.join();
 	websocket_thread.join();
 	motor_controller_thread.join();
 

@@ -29,6 +29,16 @@ typedef struct {
     uint8_t next_right_angle;
     uint8_t curr_speed;
     uint8_t next_speed;
+
+    const char* server_url;
+    const char* room_id;
+    const char* username;
+    const char* password;
+    std::string token;
+    std::string broadcaster_id;
+
+    const char* host; // Got lazy -- this is just the first part of the URL normally 
+    const char* port;
 } fish_handle_t;
 
 extern std::mutex fish_handle_mtx;
