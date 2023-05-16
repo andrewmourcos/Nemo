@@ -2,9 +2,11 @@
 This repo is one of three codebases belonging to the LamperLabs robotic control/streaming framework. A blog post describing the LamperLabs project is available here: https://andrewmourcos.github.io/projects/2021/09/21/LamperLabs.html
 
 
-https://github.com/LamperLabs/Nemo/assets/21299469/57f5491a-d6ad-4678-b49c-58f401c65247
+
+https://github.com/LamperLabs/Nemo/assets/21299469/28a3c168-ed38-4892-8583-38979966f3f5
 
 *LamperLabs robot prototype, demo running NEMO on the Nvidia Jetson*
+
 You can find more videos under the `Media/` folder.
 
 ## Description
