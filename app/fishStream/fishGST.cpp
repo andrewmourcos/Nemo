@@ -1,7 +1,7 @@
 /*
     Author: AndrewMourcos
     Date: Sep 1 2021
-    License: Not for commercial use outside LamperLabs
+    Not for commercial use.
 */
 
 #include <cstdlib>
@@ -442,9 +442,12 @@ fish_error_t createCSI2ProcessedStream(std::string video_transport_ip, std::stri
 
 /* Run gstreamer command to stream from the
  * a webcam. */
-fish_error_t videoStreamFile(std::string video_transport_ip, std::string video_transport_port, std::string video_transport_rtcp_port)
+fish_error_t videoStreamFile(std::string video_transport_ip, 
+                             std::string video_transport_port, 
+                             std::string video_transport_rtcp_port,
+                             std::string file_name)
 {
-    cv::VideoCapture cap("/mnt/c/Users/Andrew/Videos/InVision-Website-Home-Video-4-5-21.mp4");
+    cv::VideoCapture cap(file_name);
     if (!cap.isOpened()) {
         std::cerr <<"VideoCapture not opened" << std::endl;
         return FISH_EINVAL;

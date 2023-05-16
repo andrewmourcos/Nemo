@@ -1,14 +1,13 @@
 #include "gst-streamer.hpp"
 #include "../fishStream/fishGST.hpp"
 
+// TODO: remove
 #if defined(__aarch64__)
 	#define JETSON_TARGET
 #endif 
 
 void runVideoService(fish_handle_t * handle) {
 	fish_error_t err;
-    // std::string token;
-    // std::string broadcaster_id;
     std::string video_transport_id;
     std::string video_transport_ip;
     std::string video_transport_port;
@@ -104,8 +103,9 @@ void runVideoService(fish_handle_t * handle) {
     }
 
 #else
+    // TODO: remove
     // This is just used for testing purposes
-    err = videoStreamFile(video_transport_ip, video_transport_port, video_transport_rtcp_port);
+    err = videoStreamFile(video_transport_ip, video_transport_port, video_transport_rtcp_port, "/media/test.mp4");
     if (err != FISH_EOK) {
         printf("Error: could not create webcam gstream\n");
         err = cleanupBroadcaster(server_url, room_id, handle->token, handle->broadcaster_id);

@@ -1,7 +1,7 @@
 /*
     Author: AndrewMourcos
     Date: Aug 24 2021
-    License: Not for commercial use outside LamperLabs
+    Not for commercial use.
 */
 
 #include "fishIO.h"
@@ -127,7 +127,6 @@ fish_error_t setCaudalFinSpeed(serial_handle_t serial, uint8_t speed_percentage)
     char rx_buffer[3]               = {0};
     char tx_buffer[SERIAL_MSG_LEN]  = {0};
     int num_chars                   = 0;
-    int retries                     = 0;
 
     if (speed_percentage < 0 || speed_percentage > 100) {
         printf("Invalid speed requested, please use percentage (0-100)\n");
@@ -143,11 +142,10 @@ fish_error_t setCaudalFinSpeed(serial_handle_t serial, uint8_t speed_percentage)
         printf("Failed to send command to UART device\n");
         return FISH_EIO;
     }
-    sleep(0.001); // Needed to workaround Termios read()/tcflush() bug.
+    sleep(0.001); // NOTE: Needed to workaround Termios read()/tcflush() bug.
 
-    // Allow up to 20 retries on reading message from device
     num_chars = 0;
-    while (num_chars < 2 && retries < 20) {
+    while (num_chars < 2) {
         num_chars = read (serial.fid, rx_buffer, sizeof rx_buffer);
     }
 

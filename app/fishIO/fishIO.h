@@ -1,7 +1,7 @@
 /*
     Author: AndrewMourcos
     Date: Aug 24 2021
-    License: Not for commercial use outside LamperLabs
+    Not for commercial use.
 */
 
 #ifndef __FISHIO_H__

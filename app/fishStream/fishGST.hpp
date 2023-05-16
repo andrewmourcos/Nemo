@@ -71,6 +71,6 @@ fish_error_t createCSI2ProcessedStream(std::string video_transport_ip,
 
 /* Run gstreamer command to stream from the
  * a file. */
-fish_error_t videoStreamFile(std::string video_transport_ip, std::string video_transport_port, std::string video_transport_rtcp_port);
+fish_error_t videoStreamFile(std::string video_transport_ip, std::string video_transport_port, std::string video_transport_rtcp_port, std::string file_name);
 
 #endif /* __FISHGST_HPP__ */

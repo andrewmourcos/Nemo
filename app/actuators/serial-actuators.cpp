@@ -1,6 +1,7 @@
 #include "../fishIO/fishIO.h"
 #include "serial-actuators.hpp"
 
+// TODO: add support to handle case where JETSON not defined
 #if defined(__aarch64__)
     #define JETSON_TARGET
 #endif

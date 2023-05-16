@@ -113,6 +113,7 @@ fish_error_t parseSocketJson(std::string json_string, fish_handle_t * handle) {
 // Report a failure
 void fail(beast::error_code ec, char const *what)
 {
+    // TODO: move to proper error logging
     std::cerr << what << ": " << ec.message() << "\n";
 }
 
@@ -211,7 +212,9 @@ public:
                 req.set(http::field::sec_websocket_protocol, "protoo");
             }));
 
-        // Perform the websocket handshake
+        // Perform the websocket handshake 
+        // NOTE: peerId not used by server implementation yet
+        // TODO: make peerId dynamic for future server release
         ws_.async_handshake(host_, "/?roomId=FISH&peerId=12905238091",
                             beast::bind_front_handler(
                                 &session::on_handshake,
