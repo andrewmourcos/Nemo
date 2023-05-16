@@ -1,7 +1,7 @@
 /*
     Author: AndrewMourcos
     Date: Aug 24 2021
-    License: Not for commercial use outside LamperLabs
+    Not for commercial use.
 */
 
 #include "streaming/gst-streamer.hpp"
@@ -9,11 +9,11 @@
 #include "socks/boost-sock.hpp"
 #include "common/fish_types.h"
 #include <gst/gst.h>
-#include "fishStream/fishGST.hpp" // bad practice, but included to allow us to use cleanupBroadcaster
+#include "fishStream/fishGST.hpp" // TODO: remove dep
 
 #include <thread>
-#include <iostream> // cout
-#include <signal.h> // Catching ctrl-c
+#include <iostream>
+#include <signal.h>
 
 std::mutex fish_handle_mtx;
 fish_handle_t handle = {90, 90, 90, 90, 0, 0};
@@ -38,7 +38,7 @@ int main(int argc, char *argv[])
     const char* room_id = argv[2];
     const char* username = argv[3];
     const char* password = argv[4];
-    const char* host = argv[5]; // too lazy to split up server_url
+    const char* host = argv[5];
     const char* port = argv[6];
 
     handle.server_url = server_url;
@@ -50,16 +50,11 @@ int main(int argc, char *argv[])
 	
 	gst_init(&argc, &argv);
 
-	// Spawn camera thread
+	// Spawn 3 main services
 	std::thread video_thread(runVideoService, &handle);
-
-	// // Spawn websocket listener
 	std::thread websocket_thread(runWebsocketService, &handle);
-
-	// // Spawn motor controller
 	std::thread motor_controller_thread(runActuatorService, &handle);
 
-	// // Warning: There is no guarantee on the join order, so it may never end
 	video_thread.join();
 	websocket_thread.join();
 	motor_controller_thread.join();
