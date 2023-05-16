@@ -34,22 +34,21 @@ namespace ssl = boost::asio::ssl;       // from <boost/asio/ssl.hpp>
 using tcp = boost::asio::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
 
 // Sends a WebSocket message and prints the response
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
     try
     {
         // Check command line arguments.
-        if(argc != 4)
+        if (argc != 4)
         {
-            std::cerr <<
-                "Usage: websocket-client-sync-ssl <host> <port> <text>\n" <<
-                "Example:\n" <<
-                "    websocket-client-sync-ssl echo.websocket.org 443 \"Hello, world!\"\n";
+            std::cerr << "Usage: websocket-client-sync-ssl <host> <port> <text>\n"
+                      << "Example:\n"
+                      << "    websocket-client-sync-ssl echo.websocket.org 443 \"Hello, world!\"\n";
             return EXIT_FAILURE;
         }
         std::string host = argv[1];
-        auto const  port = argv[2];
-        auto const  text = argv[3];
+        auto const port = argv[2];
+        auto const text = argv[3];
 
         // The io_context is required for all I/O
         net::io_context ioc;
@@ -71,7 +70,7 @@ int main(int argc, char** argv)
         auto ep = net::connect(get_lowest_layer(ws), results);
 
         // Set SNI Hostname (many hosts need this to handshake successfully)
-        if(! SSL_set_tlsext_host_name(ws.next_layer().native_handle(), host.c_str()))
+        if (!SSL_set_tlsext_host_name(ws.next_layer().native_handle(), host.c_str()))
             throw beast::system_error(
                 beast::error_code(
                     static_cast<int>(::ERR_get_error()),
@@ -88,11 +87,11 @@ int main(int argc, char** argv)
 
         // Set a decorator to change the User-Agent of the handshake
         ws.set_option(websocket::stream_base::decorator(
-            [](websocket::request_type& req)
+            [](websocket::request_type &req)
             {
                 req.set(http::field::user_agent,
-                    std::string(BOOST_BEAST_VERSION_STRING) +
-                        " websocket-client-coro");
+                        std::string(BOOST_BEAST_VERSION_STRING) +
+                            " websocket-client-coro");
             }));
 
         // Perform the websocket handshake
@@ -115,7 +114,7 @@ int main(int argc, char** argv)
         // The make_printable() function helps print a ConstBufferSequence
         std::cout << beast::make_printable(buffer.data()) << std::endl;
     }
-    catch(std::exception const& e)
+    catch (std::exception const &e)
     {
         std::cerr << "Error: " << e.what() << std::endl;
         return EXIT_FAILURE;

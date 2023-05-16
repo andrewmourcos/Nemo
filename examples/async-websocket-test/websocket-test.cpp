@@ -13,7 +13,6 @@
 
 #include "jsoncpp/json/json.h"
 
-
 namespace beast = boost::beast;         // from <boost/beast.hpp>
 namespace http = beast::http;           // from <boost/beast/http.hpp>
 namespace websocket = beast::websocket; // from <boost/beast/websocket.hpp>
@@ -21,39 +20,46 @@ namespace net = boost::asio;            // from <boost/asio.hpp>
 namespace ssl = boost::asio::ssl;       // from <boost/asio/ssl.hpp>
 using tcp = boost::asio::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
 
+void parseSocketJson(std::string json_string)
+{
+    Json::Reader reader;
+    Json::Value root;
 
-void parseSocketJson(std::string json_string) {
-	Json::Reader reader;
-	Json::Value root;
+    if (!reader.parse(json_string, root))
+    {
+        std::cout << "Failed to parse original string json" << std::endl;
+        return;
+    }
 
-	if (!reader.parse(json_string, root)) {
-		std::cout << "Failed to parse original string json" << std::endl;
-		return;
-	}
+    std::string message = root["data"]["message"].asString();
 
-	std::string message = root["data"]["message"].asString();
+    if (!reader.parse(message, root))
+    {
+        std::cout << "Failed to parse message section of json" << std::endl;
+        return;
+    }
 
-	if (!reader.parse(message, root) ) {
-		std::cout << "Failed to parse message section of json" << std::endl;
-		return;
-	}
-
-	if (root.isMember("controlled")) {
-		// Mutex button
-		std::cout << root.get("controlled", "error").asString() << std::endl;
-
-	} else if (root.isMember("movingForward")) {
-		// Forward button
-		std::cout << root.get("movingForward", "error").asString() << std::endl;
-		std::cout << root.get("movementSpeed", "error").asString() << std::endl;
-
-	} else if (root.isMember("moveDirection")) {
-		// Left/Right button
-		std::cout << root.get("moveDirection", "error").asString() << std::endl;
-		std::cout << root.get("movementSpeed", "error").asString() << std::endl;
-	} else {
-		std::cout << "Unparsed message: " << message << std::endl;
-	}
+    if (root.isMember("controlled"))
+    {
+        // Mutex button
+        std::cout << root.get("controlled", "error").asString() << std::endl;
+    }
+    else if (root.isMember("movingForward"))
+    {
+        // Forward button
+        std::cout << root.get("movingForward", "error").asString() << std::endl;
+        std::cout << root.get("movementSpeed", "error").asString() << std::endl;
+    }
+    else if (root.isMember("moveDirection"))
+    {
+        // Left/Right button
+        std::cout << root.get("moveDirection", "error").asString() << std::endl;
+        std::cout << root.get("movementSpeed", "error").asString() << std::endl;
+    }
+    else
+    {
+        std::cout << "Unparsed message: " << message << std::endl;
+    }
 }
 
 // Report a failure
@@ -73,42 +79,44 @@ class session : public std::enable_shared_from_this<session>
 
 public:
     // Resolver and socket require an io_context
-    explicit session(net::io_context &ioc, ssl::context &ctx): resolver_(net::make_strand(ioc)), ws_(net::make_strand(ioc), ctx)
+    explicit session(net::io_context &ioc, ssl::context &ctx) : resolver_(net::make_strand(ioc)), ws_(net::make_strand(ioc), ctx)
     {
     }
 
     // Start the asynchronous operation
-    void run( char const *host, char const *port, char const *text)
+    void run(char const *host, char const *port, char const *text)
     {
         // Save these for later
         host_ = host;
         text_ = text;
 
         // Look up the domain name
-        resolver_.async_resolve( host,
-                                 port,
-                                 beast::bind_front_handler( &session::on_resolve,
-                                                            shared_from_this()));
+        resolver_.async_resolve(host,
+                                port,
+                                beast::bind_front_handler(&session::on_resolve,
+                                                          shared_from_this()));
     }
 
-    void on_resolve( beast::error_code ec,
-                     tcp::resolver::results_type results)
+    void on_resolve(beast::error_code ec,
+                    tcp::resolver::results_type results)
     {
-        if (ec) {
+        if (ec)
+        {
             return fail(ec, "resolve");
         }
         // Set a timeout on the operation
         beast::get_lowest_layer(ws_).expires_after(std::chrono::seconds(30));
 
         // Make the connection on the IP address we get from a lookup
-        beast::get_lowest_layer(ws_).async_connect( results,
-                                                    beast::bind_front_handler( &session::on_connect,
-                                                                               shared_from_this()));
+        beast::get_lowest_layer(ws_).async_connect(results,
+                                                   beast::bind_front_handler(&session::on_connect,
+                                                                             shared_from_this()));
     }
 
     void on_connect(beast::error_code ec, tcp::resolver::results_type::endpoint_type ep)
     {
-        if (ec) {
+        if (ec)
+        {
             return fail(ec, "connect");
         }
         // Update the host_ string. This will provide the value of the
@@ -120,7 +128,7 @@ public:
         beast::get_lowest_layer(ws_).expires_after(std::chrono::seconds(30));
 
         // Set SNI Hostname (many hosts need this to handshake successfully)
-        if (!SSL_set_tlsext_host_name( ws_.next_layer().native_handle(), host_.c_str()))
+        if (!SSL_set_tlsext_host_name(ws_.next_layer().native_handle(), host_.c_str()))
         {
             ec = beast::error_code(static_cast<int>(::ERR_get_error()),
                                    net::error::get_ssl_category());
@@ -128,14 +136,15 @@ public:
         }
 
         // Perform the SSL handshake
-        ws_.next_layer().async_handshake( ssl::stream_base::client,
-                                          beast::bind_front_handler( &session::on_ssl_handshake,
-                                                                     shared_from_this()));
+        ws_.next_layer().async_handshake(ssl::stream_base::client,
+                                         beast::bind_front_handler(&session::on_ssl_handshake,
+                                                                   shared_from_this()));
     }
 
     void on_ssl_handshake(beast::error_code ec)
     {
-        if (ec) {
+        if (ec)
+        {
             return fail(ec, "ssl_handshake");
         }
         // Turn off the timeout on the tcp_stream, because
@@ -149,7 +158,8 @@ public:
 
         // Set a decorator to change the User-Agent of the handshake
         ws_.set_option(websocket::stream_base::decorator(
-            [](websocket::request_type &req) {
+            [](websocket::request_type &req)
+            {
                 req.set(http::field::user_agent,
                         std::string(BOOST_BEAST_VERSION_STRING) +
                             " websocket-client-async-ssl");
@@ -165,7 +175,8 @@ public:
 
     void on_handshake(beast::error_code ec)
     {
-        if (ec) {
+        if (ec)
+        {
             return fail(ec, "handshake");
         }
 
@@ -207,7 +218,7 @@ public:
         // std::cout << beast::make_printable(buffer_.data()) << std::endl;
 
         std::string msg = beast::buffers_to_string(buffer_.data());
-        
+
         parseSocketJson(msg);
 
         // Clear buffer
@@ -219,12 +230,12 @@ public:
             beast::bind_front_handler(
                 &session::on_read,
                 shared_from_this()));
-        
     }
 
     void on_close(beast::error_code ec)
     {
-        if (ec) {
+        if (ec)
+        {
             return fail(ec, "close");
         }
         // If we get here then the connection is closed gracefully
@@ -236,7 +247,7 @@ public:
 
 int main(int argc, char const *argv[])
 {
-	if (argc != 4)
+    if (argc != 4)
     {
         std::cerr << "Usage: ./websocket-test <host> <port> <text>\n"
                   << "Example:\n"
@@ -263,5 +274,5 @@ int main(int argc, char const *argv[])
     // the socket is closed.
     ioc.run();
 
-	return 0;
+    return 0;
 }

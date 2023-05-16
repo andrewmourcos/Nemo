@@ -26,7 +26,7 @@
 #include "../common/fish_types.h"
 
 #if defined(__aarch64__)
-    #define JETSON_TARGET
+#define JETSON_TARGET
 #endif
 
 /* Checks if mediasoup room exists by sending a simple GET
@@ -41,10 +41,13 @@ fish_error_t checkRoom(const char *server_url, const char *room_id)
 
     auto res = cli.Get(room.c_str());
 
-    if (res->status != 200) {
+    if (res->status != 200)
+    {
         printf("Room not found: %s\n", room.c_str());
         return FISH_EIO;
-    } else {
+    }
+    else
+    {
         printf(">> Room found\n");
     }
 
@@ -53,7 +56,7 @@ fish_error_t checkRoom(const char *server_url, const char *room_id)
 
 /* Logs into webapp using provided credentials. Sets token for
  * future calls. Returns FISH_EOK if succesful */
-fish_error_t login(const char* server_url, const char* username, const char* password, std::string &token)
+fish_error_t login(const char *server_url, const char *username, const char *password, std::string &token)
 {
     // Set items to send in POST request
     httplib::Params params;
@@ -65,7 +68,8 @@ fish_error_t login(const char* server_url, const char* username, const char* pas
 
     auto res = cli.Post("/api/users/login", params);
 
-    if (res->status != 200) {
+    if (res->status != 200)
+    {
         printf("Failed to login with usr:%s, psw:%s", username, password);
         return FISH_EIO;
     }
@@ -80,9 +84,9 @@ fish_error_t login(const char* server_url, const char* username, const char* pas
     return FISH_EOK;
 }
 
-/* Creates broadcaster by sending POST with our metadata. 
+/* Creates broadcaster by sending POST with our metadata.
  * Returns errno::EOK if succesful */
-fish_error_t createBroadcaster(const char* server_url, const char* room_id, std::string token, std::string &broadcaster_id)
+fish_error_t createBroadcaster(const char *server_url, const char *room_id, std::string token, std::string &broadcaster_id)
 {
     boost::uuids::uuid uuid = boost::uuids::random_generator()();
     broadcaster_id = boost::lexical_cast<std::string>(uuid);
@@ -97,14 +101,16 @@ fish_error_t createBroadcaster(const char* server_url, const char* room_id, std:
           \"id\": \"%s\",                           \
           \"displayName\": \"Broadcaster\",         \
           \"device\": {\"name\": \"GStreamer\"}     \
-        }", broadcaster_id.c_str());
+        }",
+            broadcaster_id.c_str());
 
     std::string extension("/rooms/");
     extension += room_id;
     extension += "/broadcasters";
-    
+
     auto res = cli.Post(extension.c_str(), json_msg, "application/json");
-    if (res->status != 200) {
+    if (res->status != 200)
+    {
         printf("Failed to create broadcaster");
         return FISH_EIO;
     }
@@ -114,9 +120,9 @@ fish_error_t createBroadcaster(const char* server_url, const char* room_id, std:
     return FISH_EOK;
 }
 
-/* Sends HTTP DELETE to remove broadcaster when script 
+/* Sends HTTP DELETE to remove broadcaster when script
  * terminates. Returns errno::EOK if succesful. */
-fish_error_t cleanupBroadcaster(const char * server_url, const char * room_id, std::string token, std::string broadcaster_id)
+fish_error_t cleanupBroadcaster(const char *server_url, const char *room_id, std::string token, std::string broadcaster_id)
 {
     std::string extension("/rooms/");
     extension += room_id;
@@ -128,7 +134,8 @@ fish_error_t cleanupBroadcaster(const char * server_url, const char * room_id, s
     cli.set_bearer_token_auth(token.c_str());
 
     auto res = cli.Delete(extension.c_str());
-    if (res->status != 200) {
+    if (res->status != 200)
+    {
         printf("Failed to delete broadcaster");
         return FISH_EIO;
     }
@@ -136,15 +143,15 @@ fish_error_t cleanupBroadcaster(const char * server_url, const char * room_id, s
     return FISH_EOK;
 }
 
-/* Send POST to setup RTP over UDP for audio. Parse 
+/* Send POST to setup RTP over UDP for audio. Parse
  * JSON response and place in buffer passed by ref.
  * Returns errno::EOK if succesful */
-fish_error_t createPlainTransportAudio(const char * server_url, const char * room_id, 
-                                        std::string token, std::string broadcaster_id,
-                                        std::string &audio_transport_id, 
-                                        std::string &audio_transport_ip,
-                                        std::string &audio_transport_port,
-                                        std::string &audio_transport_rtcp_port)
+fish_error_t createPlainTransportAudio(const char *server_url, const char *room_id,
+                                       std::string token, std::string broadcaster_id,
+                                       std::string &audio_transport_id,
+                                       std::string &audio_transport_ip,
+                                       std::string &audio_transport_port,
+                                       std::string &audio_transport_rtcp_port)
 {
     std::string extension("/rooms/");
     extension += room_id;
@@ -164,7 +171,8 @@ fish_error_t createPlainTransportAudio(const char * server_url, const char * roo
         }";
 
     auto res = cli.Post(extension.c_str(), json_msg, "application/json");
-    if (res->status != 200) {
+    if (res->status != 200)
+    {
         printf("Failed to create plain transport audio");
         return FISH_EIO;
     }
@@ -174,25 +182,25 @@ fish_error_t createPlainTransportAudio(const char * server_url, const char * roo
     Json::Reader reader;
     Json::Value root;
     reader.parse(res->body, root);
-    audio_transport_id          = root["id"].asString();
-    audio_transport_ip          = root["ip"].asString();
-    audio_transport_port        = root["port"].asString();
-    audio_transport_rtcp_port   = root["rtcpPort"].asString();
+    audio_transport_id = root["id"].asString();
+    audio_transport_ip = root["ip"].asString();
+    audio_transport_port = root["port"].asString();
+    audio_transport_rtcp_port = root["rtcpPort"].asString();
 
     printf(">> Created audio plain transport\n");
 
     return FISH_EOK;
 }
 
-/* Send POST to setup RTP over UDP for video. Parse 
+/* Send POST to setup RTP over UDP for video. Parse
  * JSON response and place in buffer passed by ref.
  * Returns errno::EOK if succesful */
-fish_error_t createPlainTransportVideo(const char * server_url, const char * room_id, 
-                                        std::string token, std::string broadcaster_id,
-                                        std::string &video_transport_id, 
-                                        std::string &video_transport_ip,
-                                        std::string &video_transport_port,
-                                        std::string &video_transport_rtcp_port)
+fish_error_t createPlainTransportVideo(const char *server_url, const char *room_id,
+                                       std::string token, std::string broadcaster_id,
+                                       std::string &video_transport_id,
+                                       std::string &video_transport_ip,
+                                       std::string &video_transport_port,
+                                       std::string &video_transport_rtcp_port)
 {
     std::string extension("/rooms/");
     extension += room_id;
@@ -212,7 +220,8 @@ fish_error_t createPlainTransportVideo(const char * server_url, const char * roo
         }";
 
     auto res = cli.Post(extension.c_str(), json_msg, "application/json");
-    if (res->status != 200) {
+    if (res->status != 200)
+    {
         printf("Failed to create plain transport audio");
         return FISH_EIO;
     }
@@ -222,18 +231,18 @@ fish_error_t createPlainTransportVideo(const char * server_url, const char * roo
     Json::Reader reader;
     Json::Value root;
     reader.parse(res->body, root);
-    video_transport_id          = root["id"].asString();
-    video_transport_ip          = root["ip"].asString();
-    video_transport_port        = root["port"].asString();
-    video_transport_rtcp_port   = root["rtcpPort"].asString();
+    video_transport_id = root["id"].asString();
+    video_transport_ip = root["ip"].asString();
+    video_transport_port = root["port"].asString();
+    video_transport_rtcp_port = root["rtcpPort"].asString();
 
     printf(">> Created video plain transport\n");
     return FISH_EOK;
 }
 
-/* Create a mediasoup Producer to send audio by sending 
+/* Create a mediasoup Producer to send audio by sending
  * our RTP parameters via a HTTP POST. */
-fish_error_t createMediasoupProducerAudio(const char * server_url, const char * room_id, 
+fish_error_t createMediasoupProducerAudio(const char *server_url, const char *room_id,
                                           std::string token, std::string broadcaster_id,
                                           std::string audio_transport_id)
 {
@@ -273,7 +282,8 @@ fish_error_t createMediasoupProducerAudio(const char * server_url, const char * 
         }";
 
     auto res = cli.Post(extension.c_str(), json_msg, "application/json");
-    if (res->status != 200) {
+    if (res->status != 200)
+    {
         printf("Failed to create mediasoup audio producer");
         return FISH_EIO;
     }
@@ -282,9 +292,9 @@ fish_error_t createMediasoupProducerAudio(const char * server_url, const char * 
     return FISH_EOK;
 }
 
-/* Create a mediasoup Producer to send video by sending 
+/* Create a mediasoup Producer to send video by sending
  * our RTP parameters via a HTTP POST. */
-fish_error_t createMediasoupProducerVideo(const char * server_url, const char * room_id, 
+fish_error_t createMediasoupProducerVideo(const char *server_url, const char *room_id,
                                           std::string token, std::string broadcaster_id,
                                           std::string video_transport_id)
 {
@@ -326,7 +336,8 @@ fish_error_t createMediasoupProducerVideo(const char * server_url, const char * 
         }";
 
     auto res = cli.Post(extension.c_str(), json_msg, "application/json");
-    if (res->status != 200) {
+    if (res->status != 200)
+    {
         printf("Failed to create mediasoup audio producer");
         return FISH_EIO;
     }
@@ -356,8 +367,9 @@ fish_error_t createCSI2Stream(std::string video_transport_ip, std::string video_
                          ! rtpbin.send_rtp_sink_0 \
                          rtpbin.send_rtp_src_0 ! udpsink  host=%s port=%s \
                          rtpbin.send_rtcp_src_0 ! udpsink  host=%s port=%s sync=false async=false \
-                    ", video_transport_ip.c_str(), video_transport_port.c_str(), 
-                       video_transport_ip.c_str(), video_transport_rtcp_port.c_str());
+                    ",
+            video_transport_ip.c_str(), video_transport_port.c_str(),
+            video_transport_ip.c_str(), video_transport_rtcp_port.c_str());
 
     /* Build the pipeline */
     pipeline = gst_parse_launch(gstcmd_buf, NULL);
@@ -368,16 +380,17 @@ fish_error_t createCSI2Stream(std::string video_transport_ip, std::string video_
     /* Wait until error or EOS */
     bus = gst_element_get_bus(pipeline);
     msg = gst_bus_timed_pop_filtered(bus, GST_CLOCK_TIME_NONE,
-      (GstMessageType) (GST_MESSAGE_ERROR | GST_MESSAGE_EOS));
+                                     (GstMessageType)(GST_MESSAGE_ERROR | GST_MESSAGE_EOS));
 
     /* Free resources */
-    if (msg != NULL) {
-        gst_message_unref (msg);
+    if (msg != NULL)
+    {
+        gst_message_unref(msg);
     }
 
-    gst_object_unref (bus);
-    gst_element_set_state (pipeline, GST_STATE_NULL);
-    gst_object_unref (pipeline);
+    gst_object_unref(bus);
+    gst_element_set_state(pipeline, GST_STATE_NULL);
+    gst_object_unref(pipeline);
 
     return FISH_EOK;
 }
@@ -388,8 +401,9 @@ fish_error_t createCSI2ProcessedStream(std::string video_transport_ip, std::stri
                         ! nvvidconv ! video/x-raw,format=(string)BGRx \
                         ! videoconvert ! video/x-raw, format=(string)BGR ! appsink");
 
-    if (!cap.isOpened()) {
-        std::cerr <<"VideoCapture not opened" << std::endl;
+    if (!cap.isOpened())
+    {
+        std::cerr << "VideoCapture not opened" << std::endl;
         return FISH_EINVAL;
     }
 
@@ -408,26 +422,30 @@ fish_error_t createCSI2ProcessedStream(std::string video_transport_ip, std::stri
                          ! rtpbin.send_rtp_sink_0 \
                          rtpbin.send_rtp_src_0 ! udpsink host=%s port=%s \
                          rtpbin.send_rtcp_src_0 ! udpsink host=%s port=%s sync=false async=false \
-                    ", video_transport_ip.c_str(), video_transport_port.c_str(), 
-                       video_transport_ip.c_str(), video_transport_rtcp_port.c_str());
+                    ",
+            video_transport_ip.c_str(), video_transport_port.c_str(),
+            video_transport_ip.c_str(), video_transport_rtcp_port.c_str());
 
-    cv::VideoWriter writer( gstcmd_buf, 
-                            0,      // fourcc 
-                            120,     // fps
-                            cv::Size(width, height), 
-                            true);  // isColor
+    cv::VideoWriter writer(gstcmd_buf,
+                           0,   // fourcc
+                           120, // fps
+                           cv::Size(width, height),
+                           true); // isColor
 
-    if (!writer.isOpened()) {
-        std::cerr <<"VideoWriter not opened"<<std::endl;
+    if (!writer.isOpened())
+    {
+        std::cerr << "VideoWriter not opened" << std::endl;
         return FISH_EIO;
     }
     printf(">> Streaming video from file\n");
-    
+
     bool incoming_frame;
-    while (true) {
+    while (true)
+    {
         cv::Mat frame;
         incoming_frame = cap.read(frame);
-        if (!incoming_frame) {
+        if (!incoming_frame)
+        {
             break;
         }
         /* Process image here if desired */
@@ -435,21 +453,20 @@ fish_error_t createCSI2ProcessedStream(std::string video_transport_ip, std::stri
     }
 
     return FISH_EOK;
-
 }
 #endif
 
-
 /* Run gstreamer command to stream from the
  * a webcam. */
-fish_error_t videoStreamFile(std::string video_transport_ip, 
-                             std::string video_transport_port, 
+fish_error_t videoStreamFile(std::string video_transport_ip,
+                             std::string video_transport_port,
                              std::string video_transport_rtcp_port,
                              std::string file_name)
 {
     cv::VideoCapture cap(file_name);
-    if (!cap.isOpened()) {
-        std::cerr <<"VideoCapture not opened" << std::endl;
+    if (!cap.isOpened())
+    {
+        std::cerr << "VideoCapture not opened" << std::endl;
         return FISH_EINVAL;
     }
 
@@ -466,27 +483,31 @@ fish_error_t videoStreamFile(std::string video_transport_ip,
                          ! rtpbin.send_rtp_sink_0 \
                          rtpbin.send_rtp_src_0 ! udpsink host=%s port=%s \
                          rtpbin.send_rtcp_src_0 ! udpsink host=%s port=%s sync=false async=false \
-                    ", video_transport_ip.c_str(), video_transport_port.c_str(), 
-                       video_transport_ip.c_str(), video_transport_rtcp_port.c_str());
+                    ",
+            video_transport_ip.c_str(), video_transport_port.c_str(),
+            video_transport_ip.c_str(), video_transport_rtcp_port.c_str());
 
     cv::VideoWriter writer(
-        gstcmd_buf, 
-        0,      // fourcc 
-        30,     // fps
-        cv::Size(width, height), 
-        true);  // isColor
+        gstcmd_buf,
+        0,  // fourcc
+        30, // fps
+        cv::Size(width, height),
+        true); // isColor
 
-    if (!writer.isOpened()) {
-        std::cerr <<"VideoWriter not opened"<<std::endl;
+    if (!writer.isOpened())
+    {
+        std::cerr << "VideoWriter not opened" << std::endl;
         return FISH_EIO;
     }
     printf(">> Streaming video from file\n");
-    
+
     bool incoming_frame;
-    while (true) {
+    while (true)
+    {
         cv::Mat frame;
         incoming_frame = cap.read(frame);
-        if (!incoming_frame) {
+        if (!incoming_frame)
+        {
             break;
         }
         writer.write(frame);

@@ -3,6 +3,6 @@
 
 #include "../common/fish_types.h"
 
-void runVideoService(fish_handle_t * handle);
+void runVideoService(fish_handle_t *handle);
 
 #endif /* __GST_STREAMER_HPP__ */
